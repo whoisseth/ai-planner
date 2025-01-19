@@ -73,7 +73,8 @@ export default async function RootLayout({
         <Providers>
           <NextTopLoader showSpinner={false} />
           {/* <Header /> */}
-          <div className="container mx-auto w-full py-12">{children}</div>
+          <div>{children}</div>
+          {/* <div className="container mx-auto w-full py-12">{children}</div> */}
         </Providers>
         <TailwindIndicator />
         <Toaster />

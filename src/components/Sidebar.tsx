@@ -31,7 +31,7 @@ export default function Sidebar() {
   return (
     <>
       {/* Desktop Sidebar */}
-      <div className="hidden h-full flex-col border-r bg-background lg:flex">
+      <div className="hidden h-full w-56 flex-col border-r bg-background lg:flex">
         <div className="flex h-full max-h-14 items-center border-b px-4">
           <Link className="flex items-center gap-2 font-semibold" href="/">
             <LayoutDashboard className="h-6 w-6" />
