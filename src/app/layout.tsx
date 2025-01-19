@@ -8,7 +8,8 @@ import { Archivo } from "next/font/google";
 import { Libre_Franklin } from "next/font/google";
 import { Providers } from "./providers";
 import { Toaster } from "@/components/ui/toaster";
-import { Header } from "./_header/header";
+import { TailwindIndicator } from "@/components/tailwind-indicator";
+// import { Header } from "./_header/header";
 
 const archivo = Archivo({
   subsets: ["latin"],
@@ -71,9 +72,10 @@ export default async function RootLayout({
       >
         <Providers>
           <NextTopLoader showSpinner={false} />
-          <Header />
+          {/* <Header /> */}
           <div className="container mx-auto w-full py-12">{children}</div>
         </Providers>
+        <TailwindIndicator />
         <Toaster />
       </body>
     </html>
