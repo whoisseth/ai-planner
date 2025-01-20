@@ -9,6 +9,7 @@ import { Libre_Franklin } from "next/font/google";
 import { Providers } from "./providers";
 import { Toaster } from "@/components/ui/toaster";
 import { TailwindIndicator } from "@/components/tailwind-indicator";
+import { Analytics } from "@vercel/analytics/react";
 // import { Header } from "./_header/header";
 
 const archivo = Archivo({
@@ -76,6 +77,7 @@ export default async function RootLayout({
           <div>{children}</div>
           {/* <div className="container mx-auto w-full py-12">{children}</div> */}
         </Providers>
+        <Analytics />
         <TailwindIndicator />
         <Toaster />
       </body>
