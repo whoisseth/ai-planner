@@ -1,16 +1,23 @@
-"use client"
+"use client";
 
-import { useState } from 'react'
-import { Checkbox } from "@/components/ui/checkbox"
-import { Button } from "@/components/ui/button"
-import { MoreHorizontal, Plus, Trash, Calendar, Edit, Info } from 'lucide-react'
+import { useState } from "react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
+import {
+  MoreHorizontal,
+  Plus,
+  Trash,
+  Calendar,
+  Edit,
+  Info,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -18,145 +25,148 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { format } from 'date-fns'
-import { cn } from "@/lib/utils"
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/components/ui/select";
 
-export type Priority = 'Low' | 'Medium' | 'High' | 'Urgent'
+export type Priority = "Low" | "Medium" | "High" | "Urgent";
 export type SubTask = {
-  id: string
-  title: string
-  completed: boolean
-}
+  id: string;
+  title: string;
+  completed: boolean;
+};
 
 export type Task = {
-  id: string
-  title: string
-  completed: boolean
-  priority: Priority
-  dueDate?: Date
-  dueTime?: string
-  subtasks: SubTask[]
-}
+  id: string;
+  title: string;
+  completed: boolean;
+  priority: Priority;
+  dueDate?: Date;
+  dueTime?: string;
+  subtasks: SubTask[];
+};
 
 interface TaskItemProps {
-  task: Task
-  onUpdate: (task: Task) => void
-  onDelete: (id: string) => void
+  task: Task;
+  onUpdate: (task: Task) => void;
+  onDelete: (id: string) => void;
 }
 
 export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-  const [isSubtaskDialogOpen, setIsSubtaskDialogOpen] = useState(false)
-  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false)
-  const [editedTask, setEditedTask] = useState(task)
-  const [newSubtask, setNewSubtask] = useState('')
-  const [editingSubtaskId, setEditingSubtaskId] = useState<string | null>(null)
-  const [editedSubtaskTitle, setEditedSubtaskTitle] = useState('')
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isSubtaskDialogOpen, setIsSubtaskDialogOpen] = useState(false);
+  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
+  const [editedTask, setEditedTask] = useState(task);
+  const [newSubtask, setNewSubtask] = useState("");
+  const [editingSubtaskId, setEditingSubtaskId] = useState<string | null>(null);
+  const [editedSubtaskTitle, setEditedSubtaskTitle] = useState("");
 
   const handleStatusChange = () => {
-    onUpdate({ ...task, completed: !task.completed })
-  }
+    onUpdate({ ...task, completed: !task.completed });
+  };
 
   const handleSaveEdit = () => {
-    onUpdate(editedTask)
-    setIsEditDialogOpen(false)
-  }
+    onUpdate(editedTask);
+    setIsEditDialogOpen(false);
+  };
 
   const handleAddSubtask = () => {
     if (newSubtask.trim()) {
       const newSubtaskItem: SubTask = {
         id: Math.random().toString(36).substr(2, 9),
         title: newSubtask,
-        completed: false
-      }
+        completed: false,
+      };
       onUpdate({
         ...task,
-        subtasks: [...task.subtasks, newSubtaskItem]
-      })
-      setNewSubtask('')
-      setIsSubtaskDialogOpen(false)
+        subtasks: [...task.subtasks, newSubtaskItem],
+      });
+      setNewSubtask("");
+      setIsSubtaskDialogOpen(false);
     }
-  }
+  };
 
   const handleSubtaskStatusChange = (subtaskId: string) => {
-    const updatedSubtasks = task.subtasks.map(st =>
-      st.id === subtaskId ? { ...st, completed: !st.completed } : st
-    )
-    onUpdate({ ...task, subtasks: updatedSubtasks })
-  }
+    const updatedSubtasks = task.subtasks.map((st) =>
+      st.id === subtaskId ? { ...st, completed: !st.completed } : st,
+    );
+    onUpdate({ ...task, subtasks: updatedSubtasks });
+  };
 
   const handleEditSubtask = (subtaskId: string) => {
-    const subtask = task.subtasks.find(st => st.id === subtaskId)
+    const subtask = task.subtasks.find((st) => st.id === subtaskId);
     if (subtask) {
-      setEditingSubtaskId(subtaskId)
-      setEditedSubtaskTitle(subtask.title)
+      setEditingSubtaskId(subtaskId);
+      setEditedSubtaskTitle(subtask.title);
     }
-  }
+  };
 
   const handleSaveSubtaskEdit = () => {
     if (editingSubtaskId) {
-      const updatedSubtasks = task.subtasks.map(st =>
-        st.id === editingSubtaskId ? { ...st, title: editedSubtaskTitle } : st
-      )
-      onUpdate({ ...task, subtasks: updatedSubtasks })
-      setEditingSubtaskId(null)
-      setEditedSubtaskTitle('')
+      const updatedSubtasks = task.subtasks.map((st) =>
+        st.id === editingSubtaskId ? { ...st, title: editedSubtaskTitle } : st,
+      );
+      onUpdate({ ...task, subtasks: updatedSubtasks });
+      setEditingSubtaskId(null);
+      setEditedSubtaskTitle("");
     }
-  }
+  };
 
   return (
-    <div className="group flex items-start gap-2 py-2 border-b last:border-b-0">
+    <div className="group flex items-start gap-2 border-b py-2 last:border-b-0">
       <Checkbox
         checked={task.completed}
         onCheckedChange={handleStatusChange}
         id={`task-${task.id}`}
         className="mt-1"
       />
-      <div className="flex-1 min-w-0">
+      <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <label
             htmlFor={`task-${task.id}`}
             className={cn(
               "text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
-              task.completed && "line-through text-muted-foreground"
+              task.completed && "text-muted-foreground line-through",
             )}
           >
             {task.title}
           </label>
-          <span className={cn(
-            "text-xs px-1.5 py-0.5 rounded-full",
-            {
-              'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300': task.priority === 'Urgent',
-              'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300': task.priority === 'High',
-              'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300': task.priority === 'Medium',
-              'bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-300': task.priority === 'Low',
-            }
-          )}>
+          <span
+            className={cn("rounded-full px-1.5 py-0.5 text-xs", {
+              "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300":
+                task.priority === "Urgent",
+              "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300":
+                task.priority === "High",
+              "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300":
+                task.priority === "Medium",
+              "bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-300":
+                task.priority === "Low",
+            })}
+          >
             {task.priority}
           </span>
         </div>
         {(task.dueDate || task.dueTime) && (
-          <div className="flex items-center gap-1 mt-1">
+          <div className="mt-1 flex items-center gap-1">
             <Calendar className="h-3 w-3 text-muted-foreground" />
             <span className="text-xs text-muted-foreground">
-              {task.dueDate && format(task.dueDate, 'MMM d, yyyy')}
+              {task.dueDate && format(task.dueDate, "MMM d, yyyy")}
               {task.dueTime && ` at ${task.dueTime}`}
             </span>
           </div>
         )}
         {task.subtasks.length > 0 && (
           <div className="ml-4 mt-2 space-y-1">
-            {task.subtasks.map(subtask => (
+            {task.subtasks.map((subtask) => (
               <div key={subtask.id} className="flex items-center gap-2">
                 <Checkbox
                   checked={subtask.completed}
@@ -167,8 +177,8 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
                 <label
                   htmlFor={`subtask-${subtask.id}`}
                   className={cn(
-                    "text-xs flex-grow",
-                    subtask.completed && "line-through text-muted-foreground"
+                    "flex-grow text-xs",
+                    subtask.completed && "text-muted-foreground line-through",
                   )}
                 >
                   {subtask.title}
@@ -235,14 +245,18 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
               <Input
                 id="title"
                 value={editedTask.title}
-                onChange={(e) => setEditedTask({ ...editedTask, title: e.target.value })}
+                onChange={(e) =>
+                  setEditedTask({ ...editedTask, title: e.target.value })
+                }
               />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="priority">Priority</Label>
               <Select
                 value={editedTask.priority}
-                onValueChange={(value: Priority) => setEditedTask({ ...editedTask, priority: value })}
+                onValueChange={(value: Priority) =>
+                  setEditedTask({ ...editedTask, priority: value })
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select priority" />
@@ -260,8 +274,19 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
               <Input
                 id="dueDate"
                 type="date"
-                value={editedTask.dueDate ? format(editedTask.dueDate, 'yyyy-MM-dd') : ''}
-                onChange={(e) => setEditedTask({ ...editedTask, dueDate: e.target.value ? new Date(e.target.value) : undefined })}
+                value={
+                  editedTask.dueDate
+                    ? format(editedTask.dueDate, "yyyy-MM-dd")
+                    : ""
+                }
+                onChange={(e) =>
+                  setEditedTask({
+                    ...editedTask,
+                    dueDate: e.target.value
+                      ? new Date(e.target.value)
+                      : undefined,
+                  })
+                }
               />
             </div>
             <div className="grid gap-2">
@@ -269,8 +294,10 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
               <Input
                 id="dueTime"
                 type="time"
-                value={editedTask.dueTime || ''}
-                onChange={(e) => setEditedTask({ ...editedTask, dueTime: e.target.value })}
+                value={editedTask.dueTime || ""}
+                onChange={(e) =>
+                  setEditedTask({ ...editedTask, dueTime: e.target.value })
+                }
               />
             </div>
           </div>
@@ -320,22 +347,29 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
             </div>
             <div>
               <Label className="font-bold">Due Date</Label>
-              <p>{task.dueDate ? format(task.dueDate, 'MMMM d, yyyy') : 'Not set'}</p>
+              <p>
+                {task.dueDate
+                  ? format(task.dueDate, "MMMM d, yyyy")
+                  : "Not set"}
+              </p>
             </div>
             <div>
               <Label className="font-bold">Due Time</Label>
-              <p>{task.dueTime || 'Not set'}</p>
+              <p>{task.dueTime || "Not set"}</p>
             </div>
             <div>
               <Label className="font-bold">Status</Label>
-              <p>{task.completed ? 'Completed' : 'Active'}</p>
+              <p>{task.completed ? "Completed" : "Active"}</p>
             </div>
             {task.subtasks.length > 0 && (
               <div>
                 <Label className="font-bold">Subtasks</Label>
                 <ul className="list-disc pl-5">
-                  {task.subtasks.map(subtask => (
-                    <li key={subtask.id} className={subtask.completed ? 'line-through' : ''}>
+                  {task.subtasks.map((subtask) => (
+                    <li
+                      key={subtask.id}
+                      className={subtask.completed ? "line-through" : ""}
+                    >
                       {subtask.title}
                     </li>
                   ))}
@@ -345,7 +379,10 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
           </div>
         </DialogContent>
       </Dialog>
-      <Dialog open={!!editingSubtaskId} onOpenChange={() => setEditingSubtaskId(null)}>
+      <Dialog
+        open={!!editingSubtaskId}
+        onOpenChange={() => setEditingSubtaskId(null)}
+      >
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Edit Subtask</DialogTitle>
@@ -366,6 +403,5 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }
-
