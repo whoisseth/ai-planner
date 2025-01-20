@@ -18,18 +18,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
-        <div className="flex h-dvh overflow-hidden">
-          <Sidebar />
-          <div className="flex flex-1 flex-col overflow-hidden">
-            <Header />
-            <main className="flex-1 overflow-y-auto p-4">{children}</main>
-          </div>
+    <>
+      <div className="flex h-dvh overflow-hidden">
+        <Sidebar />
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <Header />
+          <main className="flex-1 overflow-y-auto p-4">{children}</main>
         </div>
-        <AIChatbox />
-        <Toaster />
-      </body>
-    </html>
+      </div>
+      <AIChatbox />
+      <Toaster />
+    </>
   );
 }

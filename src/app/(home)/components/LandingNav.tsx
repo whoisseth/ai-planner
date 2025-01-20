@@ -49,10 +49,10 @@ export default function LandingNav() {
   return (
     <nav
       className={cn(
-        "sticky top-0 z-50 w-full transition-all duration-300",
+        "sticky top-0 z-50 w-full bg-black transition-all duration-300",
         scrolled
           ? "border-b border-purple-500/10 bg-gray-950/95 backdrop-blur supports-[backdrop-filter]:bg-gray-950/60"
-          : "bg-transparent",
+          : "",
       )}
     >
       <div className="container mx-auto px-4">
@@ -103,7 +103,7 @@ export default function LandingNav() {
               <Button
                 asChild
                 variant="outline"
-                className="border-purple-500/50 text-sm font-medium text-purple-100 transition-all duration-300 hover:border-purple-500 hover:bg-purple-500/10 hover:text-purple-100"
+                className="border-purple-500/50 bg-black text-sm font-medium text-purple-100 transition-all duration-300 hover:border-purple-500 hover:bg-purple-500/10 hover:text-purple-100"
               >
                 <Link href="/dashboard">Log In</Link>
               </Button>
