@@ -77,9 +77,9 @@
     "typescript": "5.4.5"
   },
   "engines": {
-    "pnpm": ">=9.0.0",
     "node": ">=20.0.0 <21.0.0"
   },
+  "packageManager": "pnpm@9.0.0",
   "pnpm": {
     "overrides": {
       "@types/react": "^18.2.0",
