@@ -40,13 +40,13 @@ export default function BenefitsSection() {
   return (
     <section
       id="benefits"
-      className="relative overflow-hidden bg-gradient-to-br from-indigo-950 via-gray-900 to-gray-950 py-24 sm:py-32"
+      className="relative overflow-hidden bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 py-24 sm:py-32"
     >
       {/* Decorative elements */}
-      <div className="absolute inset-0 bg-[linear-gradient(45deg,#1e1b4b_25%,transparent_25%,transparent_75%,#1e1b4b_75%)] bg-[length:32px_32px] opacity-20" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_800px_at_100%_200px,#4338ca,transparent)]" />
-      <div className="absolute right-0 top-1/2 h-[400px] w-[400px] -translate-y-1/2 rounded-full bg-indigo-600/20 blur-[120px]" />
-      <div className="absolute left-0 top-0 h-[300px] w-[300px] rounded-full bg-purple-600/20 blur-[120px]" />
+      <div className="absolute inset-0 bg-[linear-gradient(45deg,#1e1b4b_1px,transparent_1px)] bg-[size:32px_32px] opacity-20" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_800px_at_100%_200px,#3b0764,transparent)]" />
+      <div className="absolute right-0 top-1/2 h-[400px] w-[400px] -translate-y-1/2 rounded-full bg-purple-600/20 blur-[120px]" />
+      <div className="absolute left-0 bottom-0 h-[300px] w-[300px] rounded-full bg-purple-600/20 blur-[120px]" />
 
       <div className="container relative mx-auto px-4">
         <div className="flex flex-col items-center text-center">

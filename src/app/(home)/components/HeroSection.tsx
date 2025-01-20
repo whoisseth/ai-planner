@@ -7,8 +7,8 @@ export default function HeroSection() {
     <header className="relative overflow-hidden bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
       {/* Decorative elements */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_110%)]" />
-      <div className="absolute -top-24 right-0 h-[400px] w-[400px] rounded-full bg-purple-600/20 blur-[120px]" />
-      <div className="absolute -bottom-24 left-0 h-[300px] w-[300px] rounded-full bg-indigo-600/20 blur-[120px]" />
+      <div className="absolute right-0 top-0 h-[400px] w-[400px] rounded-full bg-purple-600/20 blur-[120px]" />
+      <div className="absolute left-0 bottom-0 h-[300px] w-[300px] rounded-full bg-purple-600/20 blur-[120px]" />
 
       <div className="container relative mx-auto px-4 py-24 sm:py-32 lg:py-40">
         <div className="flex flex-col items-center text-center">

@@ -43,7 +43,8 @@ export default function FooterSection() {
       {/* Decorative elements */}
       <div className="absolute inset-0 bg-[url('/wave-pattern.svg')] bg-repeat opacity-5" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_600px_at_50%_-100%,#3b0764,transparent)]" />
-      <div className="absolute bottom-0 right-0 h-[300px] w-[300px] rounded-full bg-purple-600/10 blur-[120px]" />
+      <div className="absolute right-0 bottom-0 h-[400px] w-[400px] rounded-full bg-purple-600/20 blur-[120px]" />
+      <div className="absolute left-0 top-0 h-[300px] w-[300px] rounded-full bg-purple-600/20 blur-[120px]" />
 
       <div className="container relative mx-auto px-4 py-16">
         <div className="grid gap-8 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">

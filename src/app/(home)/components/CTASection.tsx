@@ -4,12 +4,12 @@ import { ArrowRight, Sparkles } from "lucide-react";
 
 export default function CTASection() {
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-gray-900 via-pink-950 to-gray-900 py-24 sm:py-32">
+    <section className="relative overflow-hidden bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 py-24 sm:py-32">
       {/* Decorative elements */}
       <div className="absolute inset-0 bg-[url('/grid-pattern.svg')] bg-center [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000_70%,transparent_110%)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_400px_at_0%_100%,#701a75,transparent)]" />
-      <div className="absolute left-1/2 top-0 h-[400px] w-[400px] -translate-x-1/2 rounded-full bg-pink-600/20 blur-[120px]" />
-      <div className="absolute bottom-0 right-0 h-[300px] w-[300px] rounded-full bg-purple-600/20 blur-[120px]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_400px_at_50%_50%,#3b0764,transparent)]" />
+      <div className="absolute right-0 top-1/2 h-[400px] w-[400px] -translate-y-1/2 rounded-full bg-purple-600/20 blur-[120px]" />
+      <div className="absolute bottom-0 left-0 h-[300px] w-[300px] rounded-full bg-purple-600/20 blur-[120px]" />
 
       <div className="container relative mx-auto px-4">
         <div className="flex flex-col items-center text-center">

@@ -53,13 +53,13 @@ export default function FeaturesSection() {
   return (
     <section
       id="features"
-      className="relative overflow-hidden bg-gradient-to-br from-gray-900 via-purple-950 to-gray-900 py-24 sm:py-32"
+      className="relative overflow-hidden bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 py-24 sm:py-32"
     >
       {/* Decorative elements */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_500px_at_50%_200px,#3b0764,transparent)]" />
       <div className="absolute inset-0 bg-[size:16px_16px] bg-purple-950/30 bg-dot-white/[0.1] [-webkit-mask-image:radial-gradient(ellipse_50%_50%_at_50%_50%,#000_70%,transparent_100%)]" />
       <div className="absolute right-0 top-1/2 h-[400px] w-[400px] -translate-y-1/2 rounded-full bg-purple-600/20 blur-[120px]" />
-      <div className="absolute left-0 top-0 h-[300px] w-[300px] rounded-full bg-indigo-600/20 blur-[120px]" />
+      <div className="absolute left-0 bottom-0 h-[300px] w-[300px] rounded-full bg-purple-600/20 blur-[120px]" />
 
       <div className="container relative mx-auto px-4">
         <div className="flex flex-col items-center text-center">
