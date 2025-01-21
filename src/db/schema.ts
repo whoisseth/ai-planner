@@ -2,7 +2,7 @@ import { integer, text, sqliteTableCreator } from "drizzle-orm/sqlite-core";
 
 export const accountTypeEnum = ["email", "google", "github"] as const;
 
-const sqliteTable = sqliteTableCreator((name) => `app_${name}`);
+const sqliteTable = sqliteTableCreator((name) => `${name}`);
 
 export const users = sqliteTable("user", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
@@ -70,6 +70,19 @@ export const sessions = sqliteTable("session", {
     })
     .notNull(),
   expiresAt: integer("expires_at").notNull(),
+});
+
+// ------ custom 
+export const chatMessages = sqliteTable("chat_messages", {
+  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
+  userId: integer("user_id", { mode: "number" })
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  content: text("content").notNull(),
+  role: text("role", { enum: ["user", "assistant"] }).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  contextId: text("context_id"),
+  metadata: text("metadata"),
 });
 
 export type User = typeof users.$inferSelect;

@@ -3,7 +3,7 @@ import { Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/toaster";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
-import AIChatbox from "@/components/AIChatbox";
+import { AIChatbox } from "@/components/AIChatbox";
 
 const inter = Inter({ subsets: ["latin"] });
 

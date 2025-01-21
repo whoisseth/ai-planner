@@ -3,7 +3,9 @@
 import NProgress from 'nprogress';
 import { signOutAction } from "@/actions/sign-out";
 
-export function SignOutButton() {
+
+
+export function SignOutButton({ buttonText = "Sign Out" }) {
   const handleSignOut = async () => {
     NProgress.start();
     try {
@@ -13,5 +15,5 @@ export function SignOutButton() {
     }
   };
 
-  return <button onClick={handleSignOut}>Sign Out</button>;
+  return <button onClick={handleSignOut}>{buttonText}</button>;
 } 

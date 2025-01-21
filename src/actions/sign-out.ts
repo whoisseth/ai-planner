@@ -1,3 +1,5 @@
+'use server'
+
 import { invalidateSession, validateRequest } from "@/lib/auth";
 import { redirect } from "next/navigation";
 export async function signOutAction() {

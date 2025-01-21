@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useTheme } from "next-themes";
+import { SignOutButton } from "./SignOutButton";
 
 export default function Header() {
   const { setTheme, theme } = useTheme();
@@ -45,7 +46,9 @@ export default function Header() {
           <DropdownMenuItem>Profile</DropdownMenuItem>
           <DropdownMenuItem>Settings</DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem>Log out</DropdownMenuItem>
+          <DropdownMenuItem>
+            <SignOutButton buttonText="Log out" />
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </header>

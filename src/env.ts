@@ -15,6 +15,12 @@ export const env = createEnv({
     AWS_REGION: z.string().min(1),
     AWS_ACCESS_KEY_ID: z.string().min(1),
     AWS_SECRET_ACCESS_KEY: z.string().min(1),
+    PINECONE_API_KEY: z.string().min(1),
+    PINECONE_INDEX: z.string().min(1),
+    PINECONE_ENVIRONMENT: z.string().min(1),
+    GROQ_API_KEY: z.string().min(1),
+    COHERE_API_KEY: z.string().min(1),
+    
   },
   client: {},
   runtimeEnv: {
@@ -30,5 +36,11 @@ export const env = createEnv({
     AWS_REGION: process.env.AWS_REGION,
     AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID,
     AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,
+    PINECONE_API_KEY: process.env.PINECONE_API_KEY,
+    GROQ_API_KEY: process.env.GROQ_API_KEY,
+    PINECONE_INDEX: process.env.PINECONE_INDEX,
+    PINECONE_ENVIRONMENT: process.env.PINECONE_ENVIRONMENT,
+    COHERE_API_KEY: process.env.COHERE_API_KEY,
+    
   },
 });
