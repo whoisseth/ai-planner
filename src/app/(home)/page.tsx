@@ -9,9 +9,9 @@ import { redirect } from "next/navigation";
 import { Header } from "../_header/header";
 
 export default async function LandingPage() {
-  const user = await getCurrentUser();
-  if (user) redirect("/dashboard");
-  redirect("/sign-in");
+  // const user = await getCurrentUser();
+  // if (user) redirect("/dashboard");
+  // redirect("/sign-in");
   return (
     <div className="flex min-h-screen flex-col">
       {/* <LandingNav /> */}
