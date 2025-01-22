@@ -94,9 +94,14 @@ export async function createSubtask(
   const task = await getTaskById(user.id, taskId);
   if (!task) throw new Error("Task not found");
 
-  const subtask = await createSubtaskDb(taskId, subtaskData);
-  revalidatePath("/");
-  return subtask;
+  try {
+    const subtask = await createSubtaskDb(taskId, subtaskData);
+    revalidatePath("/");
+    return subtask;
+  } catch (error) {
+    console.error("Error creating subtask:", error);
+    throw new Error("Failed to create subtask");
+  }
 }
 
 export async function updateSubtask(
@@ -110,9 +115,18 @@ export async function updateSubtask(
   const task = await getTaskById(user.id, taskId);
   if (!task) throw new Error("Task not found");
 
-  const updatedSubtask = await updateSubtaskDb(subtaskId, subtaskData);
-  revalidatePath("/");
-  return updatedSubtask;
+  try {
+    const updatedSubtask = await updateSubtaskDb(
+      taskId,
+      subtaskId,
+      subtaskData,
+    );
+    revalidatePath("/");
+    return updatedSubtask;
+  } catch (error) {
+    console.error("Error updating subtask:", error);
+    throw new Error("Failed to update subtask");
+  }
 }
 
 export async function deleteSubtask(taskId: string, subtaskId: string) {
@@ -121,6 +135,13 @@ export async function deleteSubtask(taskId: string, subtaskId: string) {
 
   const task = await getTaskById(user.id, taskId);
   if (!task) throw new Error("Task not found");
-  revalidatePath("/");
-  await deleteSubtaskDb(subtaskId);
+
+  try {
+    await deleteSubtaskDb(taskId, subtaskId);
+    revalidatePath("/");
+    return { success: true };
+  } catch (error) {
+    console.error("Error deleting subtask:", error);
+    throw new Error("Failed to delete subtask");
+  }
 }

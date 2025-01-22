@@ -38,6 +38,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import {
+  createSubtask,
+  updateSubtask,
+  deleteSubtask,
+} from "@/app/actions/tasks";
 
 export type Priority = "Low" | "Medium" | "High" | "Urgent";
 export type SubTask = {
@@ -87,27 +92,37 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
     }
   };
 
-  const handleAddSubtask = () => {
+  const handleAddSubtask = async () => {
     if (newSubtask.trim()) {
-      const newSubtaskItem: SubTask = {
-        id: Math.random().toString(36).substr(2, 9),
-        title: newSubtask,
-        completed: false,
-      };
-      onUpdate({
-        ...task,
-        subtasks: [...task.subtasks, newSubtaskItem],
-      });
-      setNewSubtask("");
-      setIsSubtaskDialogOpen(false);
+      try {
+        const subtaskData = {
+          title: newSubtask,
+          completed: false,
+        };
+        await createSubtask(task.id, subtaskData);
+        setNewSubtask("");
+        setIsSubtaskDialogOpen(false);
+        toast.success("Subtask added successfully");
+      } catch (error) {
+        toast.error("Failed to add subtask");
+        console.error("Failed to add subtask:", error);
+      }
     }
   };
 
-  const handleSubtaskStatusChange = (subtaskId: string) => {
-    const updatedSubtasks = task.subtasks.map((st) =>
-      st.id === subtaskId ? { ...st, completed: !st.completed } : st,
-    );
-    onUpdate({ ...task, subtasks: updatedSubtasks });
+  const handleSubtaskStatusChange = async (subtaskId: string) => {
+    try {
+      const subtask = task.subtasks.find((st) => st.id === subtaskId);
+      if (subtask) {
+        await updateSubtask(task.id, subtaskId, {
+          completed: !subtask.completed,
+        });
+        toast.success("Subtask updated successfully");
+      }
+    } catch (error) {
+      toast.error("Failed to update subtask");
+      console.error("Failed to update subtask:", error);
+    }
   };
 
   const handleEditSubtask = (subtaskId: string) => {
@@ -118,14 +133,29 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
     }
   };
 
-  const handleSaveSubtaskEdit = () => {
-    if (editingSubtaskId) {
-      const updatedSubtasks = task.subtasks.map((st) =>
-        st.id === editingSubtaskId ? { ...st, title: editedSubtaskTitle } : st,
-      );
-      onUpdate({ ...task, subtasks: updatedSubtasks });
-      setEditingSubtaskId(null);
-      setEditedSubtaskTitle("");
+  const handleSaveSubtaskEdit = async () => {
+    if (editingSubtaskId && editedSubtaskTitle.trim()) {
+      try {
+        await updateSubtask(task.id, editingSubtaskId, {
+          title: editedSubtaskTitle,
+        });
+        setEditingSubtaskId(null);
+        setEditedSubtaskTitle("");
+        toast.success("Subtask updated successfully");
+      } catch (error) {
+        toast.error("Failed to update subtask");
+        console.error("Failed to update subtask:", error);
+      }
+    }
+  };
+
+  const handleDeleteSubtask = async (subtaskId: string) => {
+    try {
+      await deleteSubtask(task.id, subtaskId);
+      toast.success("Subtask deleted successfully");
+    } catch (error) {
+      toast.error("Failed to delete subtask");
+      console.error("Failed to delete subtask:", error);
     }
   };
 
@@ -198,6 +228,14 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
                   onClick={() => handleEditSubtask(subtask.id)}
                 >
                   <Edit className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                  onClick={() => handleDeleteSubtask(subtask.id)}
+                >
+                  <Trash className="h-3 w-3" />
                 </Button>
               </div>
             ))}
