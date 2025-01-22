@@ -37,6 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { toast } from "sonner";
 
 export type Priority = "Low" | "Medium" | "High" | "Urgent";
 export type SubTask = {
@@ -71,12 +72,19 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
   const [editedSubtaskTitle, setEditedSubtaskTitle] = useState("");
 
   const handleStatusChange = () => {
+    console.log("Toggling task:", task.id, "Current status:", task.completed);
     onUpdate({ ...task, completed: !task.completed });
   };
 
-  const handleSaveEdit = () => {
-    onUpdate(editedTask);
-    setIsEditDialogOpen(false);
+  const handleSaveEdit = async () => {
+    try {
+      await onUpdate(editedTask);
+      setIsEditDialogOpen(false);
+      toast.success("Task updated successfully");
+    } catch (error) {
+      toast.error("Failed to update task");
+      console.error("Failed to update task:", error);
+    }
   };
 
   const handleAddSubtask = () => {

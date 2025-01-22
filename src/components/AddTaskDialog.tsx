@@ -20,11 +20,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Task } from "./TaskItem";
+import { toast } from "sonner";
 
 interface AddTaskDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddTask: (task: Task) => void;
+  onAddTask: (task: Omit<Task, "id" | "subtasks">) => void;
 }
 
 export function AddTaskDialog({
@@ -43,19 +44,17 @@ export function AddTaskDialog({
 
   const handleAddTask = () => {
     if (newTask.title.trim()) {
-      const task: Task = {
-        id: Math.random().toString(36).substr(2, 9),
-        completed: false,
-        subtasks: [],
+      onAddTask({
         ...newTask,
-      };
-      onAddTask(task);
+        completed: false,
+      });
       setNewTask({
         title: "",
         priority: "Medium",
         dueDate: undefined,
         dueTime: undefined,
       });
+      toast.success("Task added successfully");
       onClose();
     }
   };

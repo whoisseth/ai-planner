@@ -10,6 +10,7 @@ import { Providers } from "./providers";
 import { Toaster } from "@/components/ui/toaster";
 import { TailwindIndicator } from "@/components/tailwind-indicator";
 import { Analytics } from "@vercel/analytics/react";
+import { Toaster as SonnerToaster } from "sonner";
 // import { Header } from "./_header/header";
 
 const archivo = Archivo({
@@ -80,6 +81,7 @@ export default async function RootLayout({
         <Analytics />
         <TailwindIndicator />
         <Toaster />
+        <SonnerToaster />
       </body>
     </html>
   );

@@ -23,7 +23,7 @@ importers:
         version: 0.3.2(@langchain/core@0.3.32(openai@4.79.1(ws@8.18.0)(zod@3.24.1)))
       '@langchain/community':
         specifier: ^0.3.26
-        version: 0.3.26(@aws-crypto/sha256-js@5.2.0)(@aws-sdk/credential-provider-node@3.731.1)(@browserbasehq/sdk@2.0.0)(@browserbasehq/stagehand@1.10.0(@playwright/test@1.49.1)(deepmerge@4.3.1)(dotenv@16.4.5)(openai@4.79.1(ws@8.18.0)(zod@3.24.1))(zod@3.24.1))(@ibm-cloud/watsonx-ai@1.3.2(@langchain/core@0.3.32(openai@4.79.1(ws@8.18.0)(zod@3.24.1))))(@langchain/cohere@0.3.2(@langchain/core@0.3.32(openai@4.79.1(ws@8.18.0)(zod@3.24.1))))(@langchain/core@0.3.32(openai@4.79.1(ws@8.18.0)(zod@3.24.1)))(@langchain/groq@0.1.3(@langchain/core@0.3.32(openai@4.79.1(ws@8.18.0)(zod@3.24.1)))(ws@8.18.0))(@libsql/client@0.6.1)(@pinecone-database/pinecone@4.1.0)(@smithy/util-utf8@2.3.0)(axios@1.7.4)(cohere-ai@7.15.4)(fast-xml-parser@4.4.1)(html-to-text@9.0.5)(ibm-cloud-sdk-core@5.1.1)(ignore@5.3.2)(jsonwebtoken@9.0.2)(lodash@4.17.21)(openai@4.79.1(ws@8.18.0)(zod@3.24.1))(playwright@1.49.1)(ws@8.18.0)
+        version: 0.3.26(@aws-crypto/sha256-js@5.2.0)(@aws-sdk/credential-provider-node@3.731.1)(@browserbasehq/sdk@2.0.0)(@browserbasehq/stagehand@1.10.0(@playwright/test@1.49.1)(deepmerge@4.3.1)(dotenv@16.4.5)(openai@4.79.1(ws@8.18.0)(zod@3.24.1))(zod@3.24.1))(@ibm-cloud/watsonx-ai@1.3.2(@langchain/core@0.3.32(openai@4.79.1(ws@8.18.0)(zod@3.24.1))))(@langchain/cohere@0.3.2(@langchain/core@0.3.32(openai@4.79.1(ws@8.18.0)(zod@3.24.1))))(@langchain/core@0.3.32(openai@4.79.1(ws@8.18.0)(zod@3.24.1)))(@langchain/groq@0.1.3(@langchain/core@0.3.32(openai@4.79.1(ws@8.18.0)(zod@3.24.1)))(ws@8.18.0))(@libsql/client@0.6.1)(@pinecone-database/pinecone@4.1.0)(@smithy/eventstream-codec@1.1.0)(@smithy/protocol-http@5.0.1)(@smithy/signature-v4@5.0.1)(@smithy/util-utf8@4.0.0)(axios@1.7.4)(cohere-ai@7.15.4)(fast-xml-parser@4.4.1)(html-to-text@9.0.5)(ibm-cloud-sdk-core@5.1.1)(ignore@5.3.2)(jsonwebtoken@9.0.2)(lodash@4.17.21)(openai@4.79.1(ws@8.18.0)(zod@3.24.1))(playwright@1.49.1)(ws@8.18.0)
       '@langchain/core':
         specifier: ^0.3.32
         version: 0.3.32(openai@4.79.1(ws@8.18.0)(zod@3.24.1))
@@ -82,7 +82,7 @@ importers:
         specifier: ^1.1.2
         version: 1.1.2(@types/react-dom@18.3.5(@types/react@18.3.18))(@types/react@18.3.18)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
       '@radix-ui/react-toast':
-        specifier: ^1.1.5
+        specifier: ^1.2.4
         version: 1.2.4(@types/react-dom@18.3.5(@types/react@18.3.18))(@types/react@18.3.18)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
       '@react-email/components':
         specifier: ^0.0.19
@@ -168,6 +168,9 @@ importers:
       server-only:
         specifier: 0.0.1
         version: 0.0.1
+      sonner:
+        specifier: ^1.7.2
+        version: 1.7.2(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
       tailwind-merge:
         specifier: 2.3.0
         version: 2.3.0
@@ -4916,6 +4919,12 @@ packages:
   sisteransi@1.0.5:
     resolution: {integrity: sha512-bLGGlR1QxBcynn2d5YmDX4MGjlZvy2MRBDRNHLJ8VI6l6+9FUiyTFNJ0IveOSP0bcXgVDPRcfGqA0pjaqUpfVg==}
 
+  sonner@1.7.2:
+    resolution: {integrity: sha512-zMbseqjrOzQD1a93lxahm+qMGxWovdMxBlkTbbnZdNqVLt4j+amF9PQxUCL32WfztOFt9t9ADYkejAL3jF9iNA==}
+    peerDependencies:
+      react: ^18.0.0 || ^19.0.0 || ^19.0.0-rc
+      react-dom: ^18.0.0 || ^19.0.0 || ^19.0.0-rc
+
   source-map-js@1.2.1:
     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
     engines: {node: '>=0.10.0'}
@@ -6222,7 +6231,7 @@ snapshots:
       - aws-crt
       - encoding
 
-  '@langchain/community@0.3.26(@aws-crypto/sha256-js@5.2.0)(@aws-sdk/credential-provider-node@3.731.1)(@browserbasehq/sdk@2.0.0)(@browserbasehq/stagehand@1.10.0(@playwright/test@1.49.1)(deepmerge@4.3.1)(dotenv@16.4.5)(openai@4.79.1(ws@8.18.0)(zod@3.24.1))(zod@3.24.1))(@ibm-cloud/watsonx-ai@1.3.2(@langchain/core@0.3.32(openai@4.79.1(ws@8.18.0)(zod@3.24.1))))(@langchain/cohere@0.3.2(@langchain/core@0.3.32(openai@4.79.1(ws@8.18.0)(zod@3.24.1))))(@langchain/core@0.3.32(openai@4.79.1(ws@8.18.0)(zod@3.24.1)))(@langchain/groq@0.1.3(@langchain/core@0.3.32(openai@4.79.1(ws@8.18.0)(zod@3.24.1)))(ws@8.18.0))(@libsql/client@0.6.1)(@pinecone-database/pinecone@4.1.0)(@smithy/util-utf8@2.3.0)(axios@1.7.4)(cohere-ai@7.15.4)(fast-xml-parser@4.4.1)(html-to-text@9.0.5)(ibm-cloud-sdk-core@5.1.1)(ignore@5.3.2)(jsonwebtoken@9.0.2)(lodash@4.17.21)(openai@4.79.1(ws@8.18.0)(zod@3.24.1))(playwright@1.49.1)(ws@8.18.0)':
+  '@langchain/community@0.3.26(@aws-crypto/sha256-js@5.2.0)(@aws-sdk/credential-provider-node@3.731.1)(@browserbasehq/sdk@2.0.0)(@browserbasehq/stagehand@1.10.0(@playwright/test@1.49.1)(deepmerge@4.3.1)(dotenv@16.4.5)(openai@4.79.1(ws@8.18.0)(zod@3.24.1))(zod@3.24.1))(@ibm-cloud/watsonx-ai@1.3.2(@langchain/core@0.3.32(openai@4.79.1(ws@8.18.0)(zod@3.24.1))))(@langchain/cohere@0.3.2(@langchain/core@0.3.32(openai@4.79.1(ws@8.18.0)(zod@3.24.1))))(@langchain/core@0.3.32(openai@4.79.1(ws@8.18.0)(zod@3.24.1)))(@langchain/groq@0.1.3(@langchain/core@0.3.32(openai@4.79.1(ws@8.18.0)(zod@3.24.1)))(ws@8.18.0))(@libsql/client@0.6.1)(@pinecone-database/pinecone@4.1.0)(@smithy/eventstream-codec@1.1.0)(@smithy/protocol-http@5.0.1)(@smithy/signature-v4@5.0.1)(@smithy/util-utf8@4.0.0)(axios@1.7.4)(cohere-ai@7.15.4)(fast-xml-parser@4.4.1)(html-to-text@9.0.5)(ibm-cloud-sdk-core@5.1.1)(ignore@5.3.2)(jsonwebtoken@9.0.2)(lodash@4.17.21)(openai@4.79.1(ws@8.18.0)(zod@3.24.1))(playwright@1.49.1)(ws@8.18.0)':
     dependencies:
       '@browserbasehq/stagehand': 1.10.0(@playwright/test@1.49.1)(deepmerge@4.3.1)(dotenv@16.4.5)(openai@4.79.1(ws@8.18.0)(zod@3.24.1))(zod@3.24.1)
       '@ibm-cloud/watsonx-ai': 1.3.2(@langchain/core@0.3.32(openai@4.79.1(ws@8.18.0)(zod@3.24.1)))
@@ -6245,7 +6254,10 @@ snapshots:
       '@browserbasehq/sdk': 2.0.0
       '@libsql/client': 0.6.1
       '@pinecone-database/pinecone': 4.1.0
-      '@smithy/util-utf8': 2.3.0
+      '@smithy/eventstream-codec': 1.1.0
+      '@smithy/protocol-http': 5.0.1
+      '@smithy/signature-v4': 5.0.1
+      '@smithy/util-utf8': 4.0.0
       cohere-ai: 7.15.4
       fast-xml-parser: 4.4.1
       html-to-text: 9.0.5
@@ -10170,6 +10182,11 @@ snapshots:
   simple-wcswidth@1.0.1: {}
 
   sisteransi@1.0.5: {}
+
+  sonner@1.7.2(react-dom@19.0.0(react@19.0.0))(react@19.0.0):
+    dependencies:
+      react: 19.0.0
+      react-dom: 19.0.0(react@19.0.0)
 
   source-map-js@1.2.1: {}
 
