@@ -1,0 +1,13 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1737545896274,
+      "tag": "0000_right_thaddeus_ross",
+      "breakpoints": true
+    }
+  ]
+}

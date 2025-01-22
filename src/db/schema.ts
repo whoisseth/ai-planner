@@ -72,7 +72,7 @@ export const sessions = sqliteTable("session", {
   expiresAt: integer("expires_at").notNull(),
 });
 
-// ------ custom 
+// ------ custom
 export const chatMessages = sqliteTable("chat_messages", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   userId: integer("user_id", { mode: "number" })
@@ -80,11 +80,50 @@ export const chatMessages = sqliteTable("chat_messages", {
     .notNull(),
   content: text("content").notNull(),
   role: text("role", { enum: ["user", "assistant"] }).notNull(),
-  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(
+    () => new Date(),
+  ),
   contextId: text("context_id"),
   metadata: text("metadata"),
+});
+
+export const tasks = sqliteTable("tasks", {
+  id: text("id").primaryKey(),
+  userId: integer("user_id", { mode: "number" })
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  title: text("title").notNull(),
+  completed: integer("completed", { mode: "boolean" }).notNull().default(false),
+  priority: text("priority", { enum: ["Low", "Medium", "High", "Urgent"] })
+    .notNull()
+    .default("Medium"),
+  dueDate: integer("due_date", { mode: "timestamp" }),
+  dueTime: text("due_time"),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(
+    () => new Date(),
+  ),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(
+    () => new Date(),
+  ),
+});
+
+export const subtasks = sqliteTable("subtasks", {
+  id: text("id").primaryKey(),
+  taskId: text("task_id")
+    .references(() => tasks.id, { onDelete: "cascade" })
+    .notNull(),
+  title: text("title").notNull(),
+  completed: integer("completed", { mode: "boolean" }).notNull().default(false),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(
+    () => new Date(),
+  ),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(
+    () => new Date(),
+  ),
 });
 
 export type User = typeof users.$inferSelect;
 export type Profile = typeof profiles.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
+export type Task = typeof tasks.$inferSelect;
+export type SubTask = typeof subtasks.$inferSelect;
