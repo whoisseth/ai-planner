@@ -135,7 +135,7 @@ export function AIChatbox() {
     return (
       <Button
         onClick={() => setIsOpen(true)}
-        className="bottom:20 fixed right-4 z-50 h-14 w-14 rounded-full p-0 shadow-lg transition-all hover:shadow-xl lg:bottom-4"
+        className="bottom-20 fixed right-4 z-50 h-14 w-14 rounded-full p-0 shadow-lg transition-all hover:shadow-xl lg:bottom-4"
       >
         <MessageCircle className="h-6 w-6" />
       </Button>

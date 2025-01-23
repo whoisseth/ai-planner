@@ -19,13 +19,14 @@ class CreateTaskTool extends Tool {
         `${action} ${title}`.trim() : 
         title.trim();
 
-      await createTask({
+      const task= await createTask({
         title: taskTitle,
         priority: "Medium",
         completed: false,
         dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000),
         dueTime: "09:00",
       });
+      console.log("Task created successfully:", task.title);
       revalidatePath("/");
       return `✅ Task created successfully: "${taskTitle}"`;
     } catch (error) {
