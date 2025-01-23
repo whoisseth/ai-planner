@@ -190,29 +190,131 @@ export class TaskAgent {
     console.log("Formatting task list, received tasks:", tasks);
 
     if (tasks.length === 0) {
-      return "You don't have any tasks yet. Would you like to create one?";
+      return "📝 No tasks yet. Want to create one?";
     }
 
-    let response = `📋 Here are your tasks:\n\n`;
-    tasks.forEach((task, index) => {
-      const status = task.status === "completed" ? "✅" : "⏳";
-      const priority = `[${task.priority}]`;
-      let dueInfo = "";
-      if (task.dueDate) {
-        dueInfo += ` (Due: ${task.dueDate}`;
-        if (task.dueTime) {
-          dueInfo += ` at ${task.dueTime}`;
-        }
-        dueInfo += ")";
+    let response = `## Your Tasks\n\n`;
+
+    // Add priority legend
+    response += `**Priority Level:**\n`;
+    response += `🔴 Urgent • 🟠 High • 🟡 Medium • 🟢 Low\n\n`;
+
+    // Group tasks by status
+    const activeTasks = tasks.filter((task) => task.status !== "completed");
+    const completedTasks = tasks.filter((task) => task.status === "completed");
+
+    // Sort active tasks by due date and priority
+    activeTasks.sort((a, b) => {
+      // Priority order for sorting (highest to lowest)
+      const priorityOrder = { Urgent: 0, High: 1, Medium: 2, Low: 3 };
+
+      // If neither task has a due date, sort by priority
+      if (!a.dueDate && !b.dueDate) {
+        return (
+          priorityOrder[a.priority as keyof typeof priorityOrder] -
+          priorityOrder[b.priority as keyof typeof priorityOrder]
+        );
       }
-      response += `${index + 1}. ${status} ${task.title} ${priority}${dueInfo}\n`;
+
+      // Tasks with due dates come before tasks without due dates
+      if (!a.dueDate) return 1;
+      if (!b.dueDate) return -1;
+
+      // Sort by date first
+      const dateA = new Date(a.dueDate);
+      const dateB = new Date(b.dueDate);
+      if (dateA.getTime() !== dateB.getTime()) {
+        return dateA.getTime() - dateB.getTime();
+      }
+
+      // If dates are equal, sort by time if exists
+      if (a.dueTime && b.dueTime) {
+        return a.dueTime.localeCompare(b.dueTime);
+      }
+
+      // Tasks with time come before tasks without time
+      if (a.dueTime) return -1;
+      if (b.dueTime) return 1;
+
+      // If dates are equal and neither has time, sort by priority
+      return (
+        priorityOrder[a.priority as keyof typeof priorityOrder] -
+        priorityOrder[b.priority as keyof typeof priorityOrder]
+      );
     });
 
-    console.log("Formatted response:", response);
-    return (
-      response +
-      "\nLet me know if you want to add, update, or complete any tasks."
-    );
+    // Sort completed tasks by most recently completed (if you have a completedAt field)
+    // completedTasks.sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime());
+
+    const prioritySymbols = {
+      Urgent: "🔴",
+      High: "🟠",
+      Medium: "🟡",
+      Low: "🟢",
+    };
+
+    // Helper function to format date
+    const formatDate = (dateStr: string) => {
+      const date = new Date(dateStr);
+      const today = new Date();
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const dayAfterTomorrow = new Date(today);
+      dayAfterTomorrow.setDate(tomorrow.getDate() + 1);
+
+      if (date.toDateString() === today.toDateString()) {
+        return "Today";
+      } else if (date.toDateString() === tomorrow.toDateString()) {
+        return "Tomorrow";
+      } else {
+        return date.toLocaleDateString("en-US", {
+          day: "numeric",
+          month: "short",
+        });
+      }
+    };
+
+    // Helper function to format time
+    const formatTime = (timeStr: string) => {
+      if (!timeStr) return null;
+      const [hours, minutes] = timeStr.split(":");
+      const hour = parseInt(hours);
+      const ampm = hour >= 12 ? "PM" : "AM";
+      const hour12 = hour % 12 || 12;
+      return `${hour12}:${minutes}${ampm}`;
+    };
+
+    // Format active tasks
+    if (activeTasks.length > 0) {
+      response += "### Active\n";
+      activeTasks.forEach((task) => {
+        const priority =
+          prioritySymbols[task.priority as keyof typeof prioritySymbols];
+        let taskLine = `${priority} ${task.title}`;
+        if (task.dueDate) {
+          const formattedDate = formatDate(task.dueDate);
+          const formattedTime = task.dueTime ? formatTime(task.dueTime) : null;
+          const due = formattedTime
+            ? `⏰ ${formattedDate} at ${formattedTime}`
+            : `📅 ${formattedDate}`;
+          taskLine += ` *(${due})*`;
+        }
+        response += `- ${taskLine}\n`;
+      });
+      response += "\n";
+    }
+
+    // Format completed tasks
+    if (completedTasks.length > 0) {
+      response += `### Completed (${completedTasks.length})\n`;
+      response += "<details><summary>Show completed tasks</summary>\n\n";
+      completedTasks.forEach((task) => {
+        response += `- ✅ ${task.title}\n`;
+      });
+      response += "</details>\n";
+    }
+
+    return response;
   }
 
   async processMessage(content: string) {

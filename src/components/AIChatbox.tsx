@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, MessageCircle, X, Maximize2, Minimize2 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
+import ReactMarkdown from "react-markdown";
 
 export function AIChatbox() {
   const [isOpen, setIsOpen] = useState(false);
@@ -59,7 +60,7 @@ export function AIChatbox() {
     if (!inputValue.trim()) return;
 
     setIsLoading(true);
-    setChatMessages(prev => [...prev, { role: "user", content: inputValue }]);
+    setChatMessages((prev) => [...prev, { role: "user", content: inputValue }]);
     const userMessage = inputValue;
     setInputValue("");
 
@@ -68,53 +69,53 @@ export function AIChatbox() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: [...chatMessages, { role: "user", content: userMessage }]
-        })
+          messages: [...chatMessages, { role: "user", content: userMessage }],
+        }),
       });
 
-      if (!response.ok) throw new Error('Failed to send message');
+      if (!response.ok) throw new Error("Failed to send message");
       const reader = response.body?.getReader();
-      if (!reader) throw new Error('No reader available');
+      if (!reader) throw new Error("No reader available");
 
       let currentMessage = {
-        role: 'assistant',
-        content: '',
+        role: "assistant",
+        content: "",
         // isStreaming: true
       };
 
-      setChatMessages(prev => [...prev, currentMessage]);
+      setChatMessages((prev) => [...prev, currentMessage]);
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
         const chunk = new TextDecoder().decode(value);
-        const lines = chunk.split('\n');
+        const lines = chunk.split("\n");
 
         for (const line of lines) {
-          if (line.startsWith('data: ')) {
+          if (line.startsWith("data: ")) {
             const data = line.slice(5).trim();
-            if (data === '[DONE]') continue;
+            if (data === "[DONE]") continue;
 
             try {
               const parsed = JSON.parse(data);
 
               if (parsed.isComplete) {
                 // Replace the streaming message with the complete one
-                setChatMessages(prev => [
+                setChatMessages((prev) => [
                   ...prev.slice(0, -1),
-                  { role: 'assistant', content: parsed.content }
+                  { role: "assistant", content: parsed.content },
                 ]);
               } else if (parsed.isStreaming) {
                 // Update the current streaming message
-                setChatMessages(prev => [
+                setChatMessages((prev) => [
                   ...prev.slice(0, -1),
-                  { ...currentMessage, content: parsed.content }
+                  { ...currentMessage, content: parsed.content },
                 ]);
                 currentMessage.content = parsed.content;
               }
             } catch (e) {
-              console.error('Failed to process chunk:', e);
+              console.error("Failed to process chunk:", e);
             }
           }
         }
@@ -135,7 +136,7 @@ export function AIChatbox() {
     return (
       <Button
         onClick={() => setIsOpen(true)}
-        className="bottom-20 fixed right-4 z-50 h-14 w-14 rounded-full p-0 shadow-lg transition-all hover:shadow-xl lg:bottom-4"
+        className="fixed bottom-20 right-4 z-50 h-14 w-14 rounded-full p-0 shadow-lg transition-all hover:shadow-xl lg:bottom-4"
       >
         <MessageCircle className="h-6 w-6" />
       </Button>
@@ -212,10 +213,40 @@ export function AIChatbox() {
                   message.role === "user"
                     ? "ml-auto w-fit max-w-[80%] bg-primary text-primary-foreground"
                     : "mr-auto w-fit max-w-[80%] bg-muted",
-                  message.role === "assistant" && "whitespace-pre-wrap",
+                  message.role === "assistant" &&
+                    "prose prose-sm max-w-none dark:prose-invert prose-p:leading-relaxed prose-pre:p-0",
                 )}
               >
-                {message.content}
+                {message.role === "assistant" ? (
+                  <ReactMarkdown
+                    components={{
+                      p: ({ children }) => <p className="m-0">{children}</p>,
+                      pre: ({ children }) => (
+                        <pre className="rounded-md bg-muted-foreground/10 p-2">
+                          {children}
+                        </pre>
+                      ),
+                      code: ({ children }) => (
+                        <code className="rounded-md bg-muted-foreground/10 px-1 py-0.5">
+                          {children}
+                        </code>
+                      ),
+                      ul: ({ children }) => (
+                        <ul className="my-1 ml-4 list-disc">{children}</ul>
+                      ),
+                      ol: ({ children }) => (
+                        <ol className="my-1 ml-4 list-decimal">{children}</ol>
+                      ),
+                      li: ({ children }) => (
+                        <li className="my-0.5">{children}</li>
+                      ),
+                    }}
+                  >
+                    {message.content}
+                  </ReactMarkdown>
+                ) : (
+                  message.content
+                )}
               </div>
             ))
           )}
