@@ -18,6 +18,15 @@ export function AIChatbox() {
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [chatMessages]);
 
   // Load chat history when component mounts
   useEffect(() => {
@@ -86,14 +95,6 @@ export function AIChatbox() {
     }
   };
 
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTo(0, scrollRef.current.scrollHeight);
-    }
-  }, [chatMessages]);
-
   if (!isOpen) {
     return (
       <Button
@@ -143,7 +144,7 @@ export function AIChatbox() {
         </div>
       </div>
 
-      <ScrollArea ref={scrollRef} className="flex-1 overflow-y-auto p-4">
+      <ScrollArea className="flex-1 overflow-y-auto p-4">
         <div className="space-y-4">
           {isLoadingHistory ? (
             // Skeleton loading UI
@@ -187,6 +188,7 @@ export function AIChatbox() {
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
           )}
+          <div ref={messagesEndRef} />
         </div>
       </ScrollArea>
 
