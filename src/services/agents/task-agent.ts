@@ -46,61 +46,6 @@ export class TaskAgent {
     this.tools = [new CreateTaskTool(userId)];
   }
 
-  private async cleanTaskTitle(
-    content: string,
-  ): Promise<{ taskTitle: string; action: string }> {
-    const systemPrompt = `You are an AI that extracts and cleans up task titles from user messages.
-    Rules:
-    1. Identify the main action verb (e.g., Buy, Call, Study) ONLY if it's clearly present
-    2. If no clear action verb, leave action empty
-    3. Correct spelling mistakes (e.g., "gosories" → "groceries")
-    4. Keep important time-related information
-    5. Use proper capitalization
-    6. Remove unnecessary words like "a", "the", "task", "todo"
-    
-    Respond with JSON: { "action": "main action verb or empty if none", "taskTitle": "cleaned task details" }
-    Examples:
-    Input: "add a task buy a gosories"
-    Output: { "action": "Buy", "taskTitle": "groceries" }
-    
-    Input: "create todo meeting with john"
-    Output: { "action": "Meet", "taskTitle": "with John" }
-    
-    Input: "add task a random note" 
-    Output: { "action": "", "taskTitle": "random note" }
-    
-    Input: "remind me about dentist appointment"
-    Output: { "action": "", "taskTitle": "dentist appointment" }
-    
-    Input: "todo buy milk"
-    Output: { "action": "Buy", "taskTitle": "milk" }`;
-
-    const response = await this.model.invoke([
-      { role: "system", content: systemPrompt },
-      { role: "user", content },
-    ]);
-
-    try {
-      const parsed = JSON.parse(response.content.toString());
-      // Additional validation to prevent single letter actions
-      if (!parsed.action || parsed.action.length <= 1) {
-        parsed.action = "";
-      }
-      return parsed;
-    } catch (error) {
-      console.error("Title cleaning error:", error);
-      // Improved fallback cleaning
-      const cleanedContent = content
-        .replace(/^(add|create|task|todo|reminder|a|the)\s+/gi, "")
-        .trim();
-      return {
-        action: "",
-        taskTitle:
-          cleanedContent.charAt(0).toUpperCase() + cleanedContent.slice(1),
-      };
-    }
-  }
-
   private async analyzeIntent(
     content: string,
   ): Promise<{ isTaskCreation: boolean }> {
