@@ -5,12 +5,14 @@ import { Pinecone } from "@pinecone-database/pinecone";
 import { db } from "@/db";
 import { chatMessages } from "@/db/schema";
 import { CohereEmbeddings } from "@langchain/cohere";
+import { TaskAgent } from "../agents/task-agent";
 
 export class ChatService {
   private groq: ChatGroq;
   private vectorStore: PineconeStore;
+  private taskAgent: TaskAgent;
 
-  constructor() {
+  constructor(private userId: number) {
     // Initialize Groq
     this.groq = new ChatGroq({
       apiKey: process.env.GROQ_API_KEY || '',
@@ -32,6 +34,8 @@ export class ChatService {
     this.vectorStore = new PineconeStore(embeddings, {
       pineconeIndex: pinecone.Index(process.env.PINECONE_INDEX || ''),
     });
+
+    this.taskAgent = new TaskAgent(userId);
   }
 
   async getMessage(userId: number, messages: Array<{ role: string; content: string }>): Promise<string> {
@@ -80,5 +84,57 @@ export class ChatService {
       role,
       contextId: crypto.randomUUID(),
     });
+  }
+
+  async streamMessage(userId: number, content: string) {
+    try {
+      const agentResponse = await this.taskAgent.processMessage(content);
+      const responseText = agentResponse.toString();
+      
+      await this.saveMessage(userId, content, "user");
+      await this.saveMessage(userId, responseText, "assistant");
+      
+      const stream = new ReadableStream({
+        async start(controller) {
+          try {
+            const encoder = new TextEncoder();
+            let accumulatedText = '';
+            
+            // Stream character by character
+            for (let i = 0; i < responseText.length; i++) {
+              accumulatedText += responseText[i];
+              const message = {
+                id: crypto.randomUUID(),
+                role: 'assistant',
+                content: accumulatedText, // Send accumulated text
+                createdAt: new Date(),
+                isStreaming: true
+              };
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify(message)}\n\n`));
+              await new Promise(resolve => setTimeout(resolve, 20));
+            }
+            
+            // Send final complete message
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+              id: crypto.randomUUID(),
+              role: 'assistant',
+              content: responseText,
+              createdAt: new Date(),
+              isComplete: true
+            })}\n\n`));
+            
+            controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+            controller.close();
+          } catch (error) {
+            controller.error(error);
+          }
+        }
+      });
+
+      return stream;
+    } catch (error) {
+      console.error('Stream message error:', error);
+      throw error;
+    }
   }
 }

@@ -13,7 +13,7 @@ export function AIChatbox() {
   const [isOpen, setIsOpen] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [chatMessages, setChatMessages] = useState<
-    Array<{ role: string; content: string }>
+    Array<{ role: string; content: string; isStreaming?: boolean }>
   >([]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -59,30 +59,66 @@ export function AIChatbox() {
     if (!inputValue.trim()) return;
 
     setIsLoading(true);
-    // Add user message to chat
-    setChatMessages((prev) => [...prev, { role: "user", content: inputValue }]);
+    setChatMessages(prev => [...prev, { role: "user", content: inputValue }]);
+    const userMessage = inputValue;
     setInputValue("");
 
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: chatMessages.concat({ role: "user", content: inputValue }),
-        }),
+          messages: [...chatMessages, { role: "user", content: userMessage }]
+        })
       });
 
-      const data = await response.json();
+      if (!response.ok) throw new Error('Failed to send message');
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('No reader available');
 
-      setChatMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: data.content,
-        },
-      ]);
+      let currentMessage = {
+        role: 'assistant',
+        content: '',
+        // isStreaming: true
+      };
+
+      setChatMessages(prev => [...prev, currentMessage]);
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = new TextDecoder().decode(value);
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(5).trim();
+            if (data === '[DONE]') continue;
+
+            try {
+              const parsed = JSON.parse(data);
+
+              if (parsed.isComplete) {
+                // Replace the streaming message with the complete one
+                setChatMessages(prev => [
+                  ...prev.slice(0, -1),
+                  { role: 'assistant', content: parsed.content }
+                ]);
+              } else if (parsed.isStreaming) {
+                // Update the current streaming message
+                setChatMessages(prev => [
+                  ...prev.slice(0, -1),
+                  { ...currentMessage, content: parsed.content }
+                ]);
+                currentMessage.content = parsed.content;
+              }
+            } catch (e) {
+              console.error('Failed to process chunk:', e);
+            }
+          }
+        }
+      }
     } catch (error) {
       console.error("Chat error:", error);
       toast({

@@ -10,25 +10,22 @@ export async function POST(req: Request) {
     }
 
     const { messages } = await req.json();
+    const lastMessage = messages[messages.length - 1];
     
-    const chatService = new ChatService();
-    const response = await chatService.getMessage(user.id, messages);
+    const chatService = new ChatService(user.id);
+    const stream = await chatService.streamMessage(user.id, lastMessage.content);
 
-    return new Response(
-      JSON.stringify({
-        role: "assistant",
-        content: response,
-        id: crypto.randomUUID(),
-      }), {
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }
-    );
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+      },
+    });
   } catch (error) {
     console.error('Chat API error:', error);
     return new Response(
-      JSON.stringify({ error: error || "Internal Server Error" }), 
+      JSON.stringify({ error: "Internal Server Error" }), 
       { status: 500 }
     );
   }
