@@ -35,19 +35,61 @@ class CreateTaskTool extends Tool {
 
 class GetTasksTool extends Tool {
   name = "get_tasks";
-  description = "List all tasks from the database";
+  description = "List tasks from the database with optional date filtering";
 
   constructor(private userId: number) {
     super();
   }
 
+  private getDateFromFilter(dateFilter: string): Date | null {
+    if (!dateFilter) return null;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    switch (dateFilter.toLowerCase()) {
+      case "today":
+        return today;
+      case "tomorrow":
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        return tomorrow;
+      default:
+        try {
+          const date = new Date(dateFilter);
+          if (!isNaN(date.getTime())) return date;
+        } catch (e) {
+          console.error("Invalid date filter:", dateFilter);
+        }
+        return null;
+    }
+  }
+
   async _call(input: string) {
     try {
       console.log("GetTasksTool: Starting to fetch tasks...");
+      const { date: dateFilter } = JSON.parse(input);
+      console.log("GetTasksTool: Date filter:", dateFilter);
+
       const tasks = await getTasks();
       console.log("GetTasksTool: Raw tasks from database:", tasks);
 
-      const formattedTasks = tasks.map((task) => ({
+      let filteredTasks = tasks;
+
+      // Filter by date if specified
+      if (dateFilter) {
+        const targetDate = this.getDateFromFilter(dateFilter);
+        if (targetDate) {
+          console.log("GetTasksTool: Filtering for date:", targetDate);
+          filteredTasks = tasks.filter((task) => {
+            if (!task.dueDate) return false;
+            const taskDate = new Date(task.dueDate);
+            return taskDate.toDateString() === targetDate.toDateString();
+          });
+        }
+      }
+
+      const formattedTasks = filteredTasks.map((task) => ({
         title: task.title,
         status: task.completed ? "completed" : "active",
         priority: task.priority,
@@ -55,7 +97,10 @@ class GetTasksTool extends Tool {
         dueTime: task.dueTime || null,
       }));
 
-      console.log("GetTasksTool: Formatted tasks:", formattedTasks);
+      console.log(
+        "GetTasksTool: Filtered and formatted tasks:",
+        formattedTasks,
+      );
       return JSON.stringify(formattedTasks);
     } catch (error) {
       console.error("GetTasksTool: Error fetching tasks:", error);
@@ -77,16 +122,24 @@ export class TaskAgent {
     this.tools = [new CreateTaskTool(userId), new GetTasksTool(userId)];
   }
 
-  private async analyzeIntent(
-    content: string,
-  ): Promise<{ action: "create" | "list" | "none" }> {
+  private async analyzeIntent(content: string): Promise<{
+    action: "create" | "list" | "none";
+    filter?: string;
+    date?: string;
+  }> {
     const systemPrompt = `You are an AI assistant that analyzes user messages to determine their intent.
-    Respond with JSON: { "action": "create/list/none" }
+    Respond with JSON containing action and optional date filter.
     Examples:
-    - "create a task to buy groceries" → { "action": "create" }
-    - "show me my tasks" → { "action": "list" }
-    - "what tasks do I have" → { "action": "list" }
-    - "list all my tasks" → { "action": "list" }`;
+    - "show me today's tasks" → { "action": "list", "date": "today" }
+    - "what tasks do I have tomorrow" → { "action": "list", "date": "tomorrow" }
+    - "show tasks for next monday" → { "action": "list", "date": "next monday" }
+    - "show all my tasks" → { "action": "list" }
+    
+    Respond with JSON:
+    {
+      "action": "create/list/none",
+      "date": "today/tomorrow/next monday/etc" (optional)
+    }`;
 
     console.log("Analyzing intent for message:", content);
     const response = await this.model.invoke([
@@ -329,10 +382,17 @@ export class TaskAgent {
         return await this.tools[0].call(taskInput);
       } else if (intent.action === "list") {
         console.log("Fetching task list...");
-        const tasksResult = await this.tools[1].call("");
+        const tasksResult = await this.tools[1].call(
+          JSON.stringify({
+            date: intent.date,
+          }),
+        );
         console.log("Raw tasks result:", tasksResult);
 
         const tasks = JSON.parse(tasksResult);
+        if (tasks.length === 0 && intent.date) {
+          return `No tasks found for ${intent.date}.`;
+        }
         return this.formatTaskList(tasks);
       } else {
         console.log("No specific task action detected");
@@ -340,7 +400,7 @@ export class TaskAgent {
           {
             role: "system",
             content: `You are a helpful AI assistant that specializes in task management. 
-            Provide concise responses. Mention that you can help create tasks or show existing tasks.`,
+            Provide concise responses. Mention that you can help create tasks or show tasks for specific dates.`,
           },
           { role: "user", content },
         ]);
