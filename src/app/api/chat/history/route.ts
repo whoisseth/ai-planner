@@ -7,33 +7,36 @@ export async function GET() {
   try {
     const user = await getCurrentUser();
     if (!user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+      });
     }
 
-    // Fetch last 50 messages for the user
+    // Fetch first 50 messages for the user
     const messages = await db.query.chatMessages.findMany({
       where: (messages, { eq }) => eq(messages.userId, user.id),
       orderBy: (messages, { asc }) => [asc(messages.createdAt)],
-      limit: 50,
+      limit: 100,
     });
 
     return new Response(
       JSON.stringify({
-        messages: messages.map(msg => ({
+        messages: messages.map((msg) => ({
           role: msg.role,
           content: msg.content,
         })),
-      }), {
+      }),
+      {
         headers: {
           "Content-Type": "application/json",
         },
-      }
+      },
     );
   } catch (error) {
-    console.error('Chat history error:', error);
+    console.error("Chat history error:", error);
     return new Response(
-      JSON.stringify({ error: "Failed to fetch chat history" }), 
-      { status: 500 }
+      JSON.stringify({ error: "Failed to fetch chat history" }),
+      { status: 500 },
     );
   }
-} 
+}
