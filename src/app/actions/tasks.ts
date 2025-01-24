@@ -18,6 +18,7 @@ import { AuthenticationError } from "@/use-cases/errors";
 import { getCurrentUser } from "@/lib/session";
 import { revalidatePath } from "next/cache";
 
+
 export async function createTask(
   taskData: Omit<Task, "id" | "userId" | "createdAt" | "updatedAt">,
 ) {
@@ -29,26 +30,106 @@ export async function createTask(
   return task;
 }
 
-export async function updateTask(taskId: string, taskData: Partial<Task>) {
+export async function updateTask(taskId: string, updateData: any) {
   const user = await getCurrentUser();
   if (!user) throw new AuthenticationError();
 
-  const task = await getTaskById(user.id, taskId);
-  if (!task) throw new Error("Task not found");
-
   try {
-    // Clean up the task data before updating
-    const cleanTaskData = {
-      ...taskData,
-      dueDate: taskData.dueDate ? new Date(taskData.dueDate) : null,
-      updatedAt: new Date(),
-    };
+    console.log("Updating task with ID:", taskId);
+    console.log("Update data:", updateData);
 
-    const updatedTask = await updateTaskDb(user.id, taskId, cleanTaskData);
+    // Validate task ID
+    if (!taskId) {
+      throw new Error("Task ID is required");
+    }
+
+    // Get the current task first
+    const currentTask = await getTaskById(user.id, taskId);
+    if (!currentTask) {
+      throw new Error(`Task with ID ${taskId} not found`);
+    }
+
+    // Prepare update data
+    const validUpdateData: any = {
+      updatedAt: new Date()
+    };
+    
+    // Handle title updates - ensure it's a non-empty string
+    if (updateData.title !== undefined) {
+      if (typeof updateData.title !== 'string' || updateData.title.trim() === '') {
+        throw new Error("Title must be a non-empty string");
+      }
+      validUpdateData.title = updateData.title.trim();
+    }
+
+    // Handle priority updates
+    if (updateData.priority !== undefined) {
+      const validPriorities = ['Low', 'Medium', 'High', 'Urgent'];
+      const priority = typeof updateData.priority === 'string' ? 
+        updateData.priority.charAt(0).toUpperCase() + updateData.priority.slice(1).toLowerCase() : 
+        updateData.priority;
+      
+      if (!validPriorities.includes(priority)) {
+        throw new Error("Invalid priority value. Must be one of: Low, Medium, High, Urgent");
+      }
+      validUpdateData.priority = priority;
+    }
+
+    // Handle completion status
+    if (updateData.completed !== undefined) {
+      validUpdateData.completed = Boolean(updateData.completed);
+    }
+    
+    // Handle dueDate - ensure it's a valid date or null
+    if (updateData.dueDate !== undefined) {
+      if (updateData.dueDate === null) {
+        validUpdateData.dueDate = null;
+      } else {
+        const parsedDate = new Date(updateData.dueDate);
+        if (isNaN(parsedDate.getTime())) {
+          throw new Error("Invalid due date format");
+        }
+        validUpdateData.dueDate = parsedDate;
+      }
+    }
+
+    // Handle dueTime - ensure it's a valid time string or null
+    if (updateData.dueTime !== undefined) {
+      if (updateData.dueTime === null) {
+        validUpdateData.dueTime = null;
+      } else if (typeof updateData.dueTime === 'string' && /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(updateData.dueTime)) {
+        validUpdateData.dueTime = updateData.dueTime;
+      } else {
+        throw new Error("Invalid time format. Please use HH:mm format");
+      }
+    }
+
+    console.log("Prepared update data:", validUpdateData);
+
+    // Ensure we have at least one field to update
+    if (Object.keys(validUpdateData).length === 1 && validUpdateData.updatedAt) {
+      throw new Error("No valid fields to update");
+    }
+
+    // Update the task using the data access function
+    const updatedTask = await updateTaskDb(user.id, taskId, validUpdateData);
+    if (!updatedTask) {
+      throw new Error("Failed to update task in database");
+    }
+
+    console.log("Task updated successfully:", updatedTask);
+    
+    // Get subtasks
+    const subtasks = await getSubtasksByTaskId(taskId);
+    const taskWithSubtasks = { ...updatedTask, subtasks };
+
     revalidatePath("/");
-    return updatedTask;
+    return taskWithSubtasks;
   } catch (error) {
     console.error("Error updating task:", error);
+    if (error instanceof Error) {
+      throw new Error(`Failed to update task: ${error.message}`);
+    }
     throw new Error("Failed to update task");
   }
 }

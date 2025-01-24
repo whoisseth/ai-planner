@@ -90,6 +90,7 @@ class GetTasksTool extends Tool {
       }
 
       const formattedTasks = filteredTasks.map((task) => ({
+        id: task.id,
         title: task.title,
         status: task.completed ? "completed" : "active",
         priority: task.priority,
@@ -109,6 +110,106 @@ class GetTasksTool extends Tool {
   }
 }
 
+class UpdateTaskTool extends Tool {
+  name = "update_task";
+  description =
+    "Update an existing task's details (title, priority, due date, completion status)";
+
+  constructor(private userId: number) {
+    super();
+  }
+
+  async _call(input: string) {
+    try {
+      console.log("UpdateTaskTool: Starting to update task with input:", input);
+      const updateData = JSON.parse(input);
+      console.log("UpdateTaskTool: Parsed update data:", updateData);
+
+      if (!updateData.taskId) {
+        throw new Error("Task ID is required for updates");
+      }
+
+      // Get the current task first
+      const tasks = await getTasks();
+      const currentTask = tasks.find((t) => t.id === updateData.taskId);
+      if (!currentTask) {
+        throw new Error(`Task with ID ${updateData.taskId} not found`);
+      }
+      console.log("UpdateTaskTool: Found current task:", currentTask);
+
+      // Prepare update data
+      const finalUpdateData: any = {};
+
+      // Only include fields that are actually changing and have valid values
+      if (updateData.title && updateData.title !== currentTask.title) {
+        finalUpdateData.title = updateData.title.trim();
+      }
+      if (updateData.priority && updateData.priority !== currentTask.priority) {
+        finalUpdateData.priority = updateData.priority;
+      }
+      if (updateData.dueDate !== undefined) {
+        finalUpdateData.dueDate = updateData.dueDate
+          ? new Date(updateData.dueDate)
+          : null;
+      }
+      if (updateData.dueTime !== undefined) {
+        finalUpdateData.dueTime = updateData.dueTime;
+      }
+      if (
+        updateData.completed !== undefined &&
+        updateData.completed !== currentTask.completed
+      ) {
+        finalUpdateData.completed = updateData.completed;
+      }
+
+      console.log("UpdateTaskTool: Final update data:", finalUpdateData);
+
+      if (Object.keys(finalUpdateData).length === 0) {
+        return "No changes needed for the task.";
+      }
+
+      const updatedTask = await updateTask(updateData.taskId, finalUpdateData);
+      if (!updatedTask) {
+        throw new Error("Failed to update task in database");
+      }
+      console.log("UpdateTaskTool: Task updated successfully:", updatedTask);
+
+      // Prepare success message
+      let message = `✅ Task updated successfully: "${updatedTask.title}"`;
+      const changes: string[] = [];
+
+      if (finalUpdateData.title) changes.push("title updated");
+      if (finalUpdateData.priority)
+        changes.push(`priority set to ${finalUpdateData.priority}`);
+      if (finalUpdateData.dueDate)
+        changes.push(
+          `due date set to ${new Date(finalUpdateData.dueDate).toLocaleDateString()}`,
+        );
+      if (finalUpdateData.dueTime)
+        changes.push(`time set to ${finalUpdateData.dueTime}`);
+      if (finalUpdateData.completed !== undefined)
+        changes.push(
+          finalUpdateData.completed
+            ? "marked as completed"
+            : "marked as not completed",
+        );
+
+      if (changes.length > 0) {
+        message += ` (${changes.join(", ")})`;
+      }
+
+      revalidatePath("/");
+      return message;
+    } catch (error) {
+      console.error("UpdateTaskTool: Error updating task:", error);
+      if (error instanceof Error) {
+        return `Failed to update task: ${error.message}`;
+      }
+      return "Failed to update task. Please try again with valid task details.";
+    }
+  }
+}
+
 export class TaskAgent {
   private model: ChatGroq;
   private tools: Tool[];
@@ -119,26 +220,48 @@ export class TaskAgent {
       modelName: "mixtral-8x7b-32768",
     });
 
-    this.tools = [new CreateTaskTool(userId), new GetTasksTool(userId)];
+    this.tools = [
+      new CreateTaskTool(userId),
+      new GetTasksTool(userId),
+      new UpdateTaskTool(userId),
+    ];
   }
 
   private async analyzeIntent(content: string): Promise<{
-    action: "create" | "list" | "none";
+    action: "create" | "list" | "update" | "none";
     filter?: string;
     date?: string;
+    taskUpdate?: {
+      taskId?: number;
+      title?: string;
+      priority?: string;
+      dueDate?: string;
+      dueTime?: string;
+      completed?: boolean;
+    };
   }> {
     const systemPrompt = `You are an AI assistant that analyzes user messages to determine their intent.
-    Respond with JSON containing action and optional date filter.
+    Respond with JSON containing action and relevant details.
     Examples:
     - "show me today's tasks" → { "action": "list", "date": "today" }
-    - "what tasks do I have tomorrow" → { "action": "list", "date": "tomorrow" }
-    - "show tasks for next monday" → { "action": "list", "date": "next monday" }
-    - "show all my tasks" → { "action": "list" }
+    - "mark task 'Go for Walk' as completed" → { "action": "update", "taskUpdate": { "title": "Go for Walk", "completed": true } }
+    - "update Go for Walk task to tomorrow" → { "action": "update", "taskUpdate": { "title": "Go for Walk", "dueDate": "tomorrow" } }
+    - "change the time for task Go for Walk to 5am" → { "action": "update", "taskUpdate": { "title": "Go for Walk", "dueTime": "05:00" } }
+    - "update the task Go for Walk to tomorrow 5am" → { "action": "update", "taskUpdate": { "title": "Go for Walk", "dueDate": "tomorrow", "dueTime": "05:00" } }
+    - "make Go for Walk task urgent" → { "action": "update", "taskUpdate": { "title": "Go for Walk", "priority": "Urgent" } }
     
     Respond with JSON:
     {
-      "action": "create/list/none",
-      "date": "today/tomorrow/next monday/etc" (optional)
+      "action": "create/list/update/none",
+      "date": "today/tomorrow/etc" (optional),
+      "taskUpdate": {
+        "taskId": number (optional),
+        "title": string (for finding task by title),
+        "priority": "Urgent/High/Medium/Low",
+        "dueDate": "date string",
+        "dueTime": "HH:mm",
+        "completed": boolean
+      } (for update action)
     }`;
 
     console.log("Analyzing intent for message:", content);
@@ -236,6 +359,213 @@ export class TaskAgent {
         dueTime: null,
         priority: "Medium",
       };
+    }
+  }
+
+  private findTaskByTitle(searchTitle: string, tasks: any[]): string | null {
+    if (!searchTitle || !tasks.length) return null;
+
+    // Clean up the search title - remove quotes and extra spaces
+    const cleanSearchTitle = searchTitle
+      .toLowerCase()
+      .trim()
+      .replace(/['"]/g, "");
+    console.log("Searching for task with title:", cleanSearchTitle);
+
+    // First try exact match (case insensitive)
+    const exactMatch = tasks.find(
+      (task) => task.title.toLowerCase().trim() === cleanSearchTitle,
+    );
+    if (exactMatch) {
+      console.log(
+        "Found exact match:",
+        exactMatch.title,
+        "with ID:",
+        exactMatch.id,
+      );
+      return exactMatch.id;
+    }
+
+    // Then try contains match
+    const containsMatch = tasks.find(
+      (task) =>
+        task.title.toLowerCase().includes(cleanSearchTitle) ||
+        cleanSearchTitle.includes(task.title.toLowerCase()),
+    );
+    if (containsMatch) {
+      console.log(
+        "Found contains match:",
+        containsMatch.title,
+        "with ID:",
+        containsMatch.id,
+      );
+      return containsMatch.id;
+    }
+
+    // Try matching individual words
+    const searchWords = cleanSearchTitle
+      .split(" ")
+      .filter((word) => word.length > 1);
+    const partialMatch = tasks.find((task) => {
+      const taskWords = task.title.toLowerCase().split(" ");
+      const matches = searchWords.some((word) =>
+        taskWords.some(
+          (taskWord: string) =>
+            taskWord.includes(word) || word.includes(taskWord),
+        ),
+      );
+      return matches;
+    });
+    if (partialMatch) {
+      console.log(
+        "Found partial match:",
+        partialMatch.title,
+        "with ID:",
+        partialMatch.id,
+      );
+      return partialMatch.id;
+    }
+
+    console.log("No matching task found");
+    return null;
+  }
+
+  private async analyzeTaskUpdate(content: string, tasks: any[]) {
+    console.log("\n=== Starting Task Update Analysis ===");
+    console.log("Input content:", content);
+    console.log(
+      "Available tasks with IDs:",
+      tasks.map(
+        (t: {
+          id: string;
+          title: string;
+          priority: string;
+          completed: boolean;
+        }) => ({
+          id: t.id,
+          title: t.title,
+          priority: t.priority,
+          completed: t.completed,
+        }),
+      ),
+    );
+
+    const systemPrompt = `You are an AI that analyzes task update details from user messages.
+    Extract update information from the message, including any changes to title, date, time, priority, or completion status.
+    
+    Available tasks:
+    ${tasks.map((t) => `- "${t.title}" (ID: ${t.id})`).join("\n")}
+
+    When analyzing updates:
+    1. For title changes:
+       - Match partial titles (e.g., "clean living room" matches "Clean Living Room, Dust, Sweep")
+       - Clean and capitalize new titles
+    2. For time/date:
+       - Convert relative dates (e.g., "tomorrow") to actual dates
+       - Convert times to 24-hour format (HH:mm)
+    
+    Return JSON with:
+    {
+      "searchTitle": "current title to find the task (can be partial)",
+      "updates": {
+        "title": "new title if changing",
+        "priority": "Urgent/High/Medium/Low" (if changing priority),
+        "dueDate": "YYYY-MM-DD" (if changing date),
+        "dueTime": "HH:mm" (if changing time),
+        "completed": boolean (if marking complete/incomplete)
+      }
+    }
+
+    Examples:
+    Input: "update the time for task 'clean living room' to clean guest room and set time for tomorrow"
+    Output: {
+      "searchTitle": "clean living room",
+      "updates": {
+        "title": "Clean Guest Room",
+        "dueDate": "tomorrow",
+        "dueTime": "09:00"
+      }
+    }
+
+    Input: "change go for walk to morning run at 7am"
+    Output: {
+      "searchTitle": "Go for Walk",
+      "updates": {
+        "title": "Morning Run",
+        "dueTime": "07:00"
+      }
+    }`;
+
+    const response = await this.model.invoke([
+      { role: "system", content: systemPrompt },
+      { role: "user", content },
+    ]);
+
+    try {
+      const result = JSON.parse(response.content.toString());
+      console.log("LLM Analysis Result:", result);
+
+      // Find the task ID using the helper method
+      const taskId = this.findTaskByTitle(result.searchTitle, tasks);
+      console.log("Task ID found:", taskId);
+      console.log("For search title:", result.searchTitle);
+
+      if (!taskId) {
+        console.log("No task ID found for title:", result.searchTitle);
+        return null;
+      }
+
+      // Get the current task for reference
+      const currentTask = tasks.find((t) => t.id === taskId);
+      console.log("Current task details:", currentTask);
+
+      // Handle date updates
+      if (result.updates.dueDate === "tomorrow") {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        result.updates.dueDate = tomorrow.toISOString().split("T")[0];
+      }
+
+      // If time isn't specified but date is updated to tomorrow, use a default morning time
+      if (result.updates.dueDate && !result.updates.dueTime) {
+        result.updates.dueTime = "09:00";
+      }
+
+      // Convert time format if needed (e.g., "6am" to "06:00")
+      if (result.updates.dueTime) {
+        const timeMatch = result.updates.dueTime.match(
+          /(\d+)(?::(\d+))?\s*(am|pm)?/i,
+        );
+        if (timeMatch) {
+          let [_, hours, minutes = "00", ampm] = timeMatch;
+          hours = parseInt(hours);
+          if (ampm?.toLowerCase() === "pm" && hours < 12) hours += 12;
+          if (ampm?.toLowerCase() === "am" && hours === 12) hours = 0;
+          result.updates.dueTime = `${hours.toString().padStart(2, "0")}:${minutes}`;
+        }
+      }
+
+      // Clean up the new title if provided
+      if (result.updates.title) {
+        result.updates.title = result.updates.title
+          .split(" ")
+          .map(
+            (word: string) =>
+              word.charAt(0).toUpperCase() + word.slice(1).toLowerCase(),
+          )
+          .join(" ")
+          .trim();
+      }
+
+      const updateData = {
+        taskId,
+        ...result.updates,
+      };
+      console.log("Final update data to be sent:", updateData);
+      return updateData;
+    } catch (error) {
+      console.error("Task update analysis error:", error);
+      return null;
     }
   }
 
@@ -372,40 +702,126 @@ export class TaskAgent {
 
   async processMessage(content: string) {
     try {
-      console.log("Processing message:", content);
+      console.log("\n=== Processing Message ===");
+      console.log("Input content:", content);
       const intent = await this.analyzeIntent(content);
+      console.log("Analyzed intent:", intent);
 
-      if (intent.action === "create") {
-        console.log("Creating new task...");
-        const taskDetails = await this.analyzeTaskInput(content);
-        const taskInput = JSON.stringify(taskDetails);
-        return await this.tools[0].call(taskInput);
-      } else if (intent.action === "list") {
-        console.log("Fetching task list...");
-        const tasksResult = await this.tools[1].call(
-          JSON.stringify({
-            date: intent.date,
-          }),
-        );
-        console.log("Raw tasks result:", tasksResult);
+      switch (intent.action) {
+        case "create":
+          console.log("Creating new task...");
+          const taskDetails = await this.analyzeTaskInput(content);
+          const taskInput = JSON.stringify(taskDetails);
+          return await this.tools[0].call(taskInput);
 
-        const tasks = JSON.parse(tasksResult);
-        if (tasks.length === 0 && intent.date) {
-          return `No tasks found for ${intent.date}.`;
-        }
-        return this.formatTaskList(tasks);
-      } else {
-        console.log("No specific task action detected");
-        const response = await this.model.invoke([
-          {
-            role: "system",
-            content: `You are a helpful AI assistant that specializes in task management. 
-            Provide concise responses. Mention that you can help create tasks or show tasks for specific dates.`,
-          },
-          { role: "user", content },
-        ]);
+        case "list":
+          console.log("Fetching task list...");
+          const tasksResult = await this.tools[1].call(
+            JSON.stringify({
+              date: intent.date,
+            }),
+          );
+          console.log("Raw tasks result:", tasksResult);
+          const tasks = JSON.parse(tasksResult);
+          if (tasks.length === 0 && intent.date) {
+            return `No tasks found for ${intent.date}.`;
+          }
+          return this.formatTaskList(tasks);
 
-        return response.content;
+        case "update":
+          console.log("\n=== Processing Update Request ===");
+          // First get all tasks to find the one to update
+          const allTasksResult = await this.tools[1].call(JSON.stringify({}));
+          const allTasks = JSON.parse(allTasksResult);
+          console.log(
+            "All available tasks:",
+            allTasks.map(
+              (t: {
+                id: string;
+                title: string;
+                priority: string;
+                completed: boolean;
+              }) => ({
+                id: t.id,
+                title: t.title,
+                priority: t.priority,
+                completed: t.completed,
+              }),
+            ),
+          );
+
+          let updateData;
+          if (intent.taskUpdate?.taskId) {
+            // If we have a direct task ID, use it
+            updateData = intent.taskUpdate;
+            console.log("Using direct task ID:", updateData);
+          } else if (intent.taskUpdate?.title) {
+            // If we have a title, analyze the update and find the matching task
+            const taskUpdate = await this.analyzeTaskUpdate(content, allTasks);
+            console.log("Task update analysis result:", taskUpdate);
+
+            if (!taskUpdate) {
+              // Try direct title match first
+              const taskId = this.findTaskByTitle(
+                intent.taskUpdate.title,
+                allTasks,
+              );
+              console.log(
+                "Direct title match attempt - Title:",
+                intent.taskUpdate.title,
+                "Found ID:",
+                taskId,
+              );
+
+              if (taskId) {
+                updateData = {
+                  taskId,
+                  ...intent.taskUpdate,
+                };
+                delete updateData.title; // Remove title from updates
+                console.log("Using direct title match data:", updateData);
+              } else {
+                console.log(
+                  "No task found with title:",
+                  intent.taskUpdate.title,
+                );
+                return `I couldn't find that task. Available tasks are:\n${allTasks.map((t: any, i: number) => `${i + 1}. "${t.title}" (ID: ${t.id})`).join("\n")}\nPlease try again with the exact task name.`;
+              }
+            } else {
+              updateData = taskUpdate;
+              console.log("Using analyzed task update data:", updateData);
+            }
+          }
+
+          if (!updateData?.taskId) {
+            console.log("No task ID found in update data");
+            return "Please specify which task you want to update.";
+          }
+
+          console.log("Sending update with data:", updateData);
+          const updateResult = await this.tools[2].call(
+            JSON.stringify(updateData),
+          );
+          console.log("Update result:", updateResult);
+
+          // After successful update, show the updated task list
+          const updatedTasksResult = await this.tools[1].call(
+            JSON.stringify({}),
+          );
+          const updatedTasks = JSON.parse(updatedTasksResult);
+          return `${updateResult}\n\n${this.formatTaskList(updatedTasks)}`;
+
+        default:
+          console.log("No specific task action detected");
+          const response = await this.model.invoke([
+            {
+              role: "system",
+              content: `You are a helpful AI assistant that specializes in task management. 
+              Provide concise responses. Mention that you can help create, update, or show tasks.`,
+            },
+            { role: "user", content },
+          ]);
+          return response.content;
       }
     } catch (error) {
       console.error("Message processing error:", error);
