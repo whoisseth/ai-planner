@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, MessageCircle, X, Maximize2, Minimize2 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
-import ReactMarkdown from "react-markdown";
+import MarkdownPreview from "@uiw/react-markdown-preview";
 
 export function AIChatbox() {
   const [isOpen, setIsOpen] = useState(false);
@@ -212,38 +212,19 @@ export function AIChatbox() {
                   "flex flex-col gap-2 rounded-lg px-4 py-2.5 text-sm",
                   message.role === "user"
                     ? "ml-auto w-fit max-w-[80%] bg-primary text-primary-foreground"
-                    : "mr-auto w-fit max-w-[80%] bg-muted",
-                  message.role === "assistant" &&
-                    "prose prose-sm max-w-none dark:prose-invert prose-p:leading-relaxed prose-pre:p-0",
+                    : "mr-auto w-fit max-w-[80%] bg-secondary",
                 )}
               >
                 {message.role === "assistant" ? (
-                  <ReactMarkdown
-                    components={{
-                      p: ({ children }) => <p className="m-0">{children}</p>,
-                      pre: ({ children }) => (
-                        <pre className="rounded-md bg-muted-foreground/10 p-2">
-                          {children}
-                        </pre>
-                      ),
-                      code: ({ children }) => (
-                        <code className="rounded-md bg-muted-foreground/10 px-1 py-0.5">
-                          {children}
-                        </code>
-                      ),
-                      ul: ({ children }) => (
-                        <ul className="my-1 ml-4 list-disc">{children}</ul>
-                      ),
-                      ol: ({ children }) => (
-                        <ol className="my-1 ml-4 list-decimal">{children}</ol>
-                      ),
-                      li: ({ children }) => (
-                        <li className="my-0.5">{children}</li>
-                      ),
+                  <MarkdownPreview
+                    source={message.content}
+                    style={{
+                      backgroundColor: "transparent",
+                      color: "inherit",
+                      fontSize: "0.875rem",
                     }}
-                  >
-                    {message.content}
-                  </ReactMarkdown>
+                    className="[&_.wmde-markdown]:bg-transparent [&_blockquote]:pl-4 [&_blockquote]:italic [&_code]:rounded [&_code]:px-1.5 [&_code]:py-0.5 [&_li]:mb-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_pre]:rounded-lg [&_pre]:p-4 [&_table]:my-4 [&_table]:w-full [&_table]:border-collapse [&_table]:overflow-hidden [&_table]:rounded-lg [&_td]:border [&_td]:border-border [&_td]:p-3 [&_td]:text-primary-foreground dark:[&_td]:text-foreground [&_th]:border [&_th]:border-border [&_th]:p-3 [&_th]:text-left [&_th]:font-semibold [&_th]:text-primary-foreground dark:[&_th]:text-foreground [&_ul]:list-disc [&_ul]:pl-6"
+                  />
                 ) : (
                   message.content
                 )}
