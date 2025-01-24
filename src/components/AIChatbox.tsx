@@ -13,6 +13,11 @@ import MarkdownPreview from "@uiw/react-markdown-preview";
 export function AIChatbox() {
   const [isOpen, setIsOpen] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [width, setWidth] = useState(500); // Default width
+  const [startX, setStartX] = useState(0);
+  const [startWidth, setStartWidth] = useState(0);
+  const chatBoxRef = useRef<HTMLDivElement>(null);
   const [chatMessages, setChatMessages] = useState<
     Array<{ role: string; content: string; isStreaming?: boolean }>
   >([]);
@@ -132,6 +137,42 @@ export function AIChatbox() {
     }
   };
 
+  // Handle mouse down event to start dragging
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(true);
+    setStartX(e.clientX);
+    setStartWidth(width);
+  };
+
+  // Handle mouse move event while dragging
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging) return;
+
+      const deltaX = startX - e.clientX;
+      const newWidth = Math.max(400, Math.min(1200, startWidth + deltaX));
+      setWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    if (isDragging) {
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+      // Prevent text selection while dragging
+      document.body.style.userSelect = "none";
+    }
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.userSelect = "";
+    };
+  }, [isDragging, startX, startWidth]);
+
   if (!isOpen) {
     return (
       <Button
@@ -145,20 +186,44 @@ export function AIChatbox() {
 
   return (
     <Card
+      ref={chatBoxRef}
       className={cn(
-        "fixed z-50 flex flex-col overflow-hidden shadow-xl transition-all duration-300 ease-in-out",
+        "fixed z-50 flex flex-col overflow-hidden shadow-xl",
         isFullScreen
-          ? "inset-0 rounded-none md:inset-4 md:rounded-lg"
-          : "bottom-4 right-4 h-[600px] max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] rounded-lg md:w-[400px]",
+          ? "inset-0 w-full rounded-none md:inset-4 md:rounded-lg"
+          : "bottom-4 right-4 h-[600px] max-h-[calc(100vh-2rem)] rounded-lg",
+        isDragging && "select-none",
       )}
+      style={
+        !isFullScreen
+          ? {
+              width: `${width}px`,
+              transition: isDragging ? "none" : "width 0.3s ease-in-out",
+            }
+          : undefined
+      }
     >
+      {/* Add drag handle with improved styling */}
+      {!isFullScreen && (
+        <div
+          className="absolute left-0 top-0 h-full w-2 cursor-ew-resize hover:bg-primary/10 active:bg-primary/20"
+          onMouseDown={handleMouseDown}
+          style={{ touchAction: "none" }}
+        />
+      )}
+
       <div className="flex items-center justify-between border-b p-4">
         <h3 className="text-lg font-semibold">AI Assistant</h3>
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setIsFullScreen(!isFullScreen)}
+            onClick={() => {
+              setIsFullScreen(!isFullScreen);
+              if (!isFullScreen) {
+                setWidth(500); // Reset width when going fullscreen
+              }
+            }}
             className="hover:bg-primary/10"
           >
             {isFullScreen ? (
@@ -173,6 +238,7 @@ export function AIChatbox() {
             onClick={() => {
               setIsOpen(false);
               setIsFullScreen(false);
+              setWidth(500); // Reset width when closing
             }}
             className="hover:bg-primary/10"
           >
@@ -181,8 +247,15 @@ export function AIChatbox() {
         </div>
       </div>
 
-      <ScrollArea className="flex-1 overflow-y-auto p-4">
-        <div className="space-y-4">
+      <ScrollArea
+        className={cn(
+          "flex-1 overflow-y-auto p-4",
+          isDragging && "pointer-events-none", // Prevent scroll during resize
+        )}
+      >
+        <div
+          className={cn("space-y-4", isFullScreen && "mx-auto max-w-2xl px-4")}
+        >
           {isLoadingHistory ? (
             // Skeleton loading UI
             <div className="space-y-4">
@@ -212,21 +285,54 @@ export function AIChatbox() {
                   "flex flex-col gap-2 rounded-lg px-4 py-2.5 text-sm",
                   message.role === "user"
                     ? "ml-auto w-fit max-w-[80%] bg-primary text-primary-foreground"
-                    : "mr-auto w-fit max-w-[80%] bg-secondary",
+                    : "mr-auto w-full bg-secondary/50 backdrop-blur-sm",
                 )}
               >
                 {message.role === "assistant" ? (
-                  <MarkdownPreview
-                    source={message.content}
-                    style={{
-                      backgroundColor: "transparent",
-                      color: "inherit",
-                      fontSize: "0.875rem",
-                    }}
-                    className="[&_.wmde-markdown]:bg-transparent [&_blockquote]:pl-4 [&_blockquote]:italic [&_code]:rounded [&_code]:px-1.5 [&_code]:py-0.5 [&_li]:mb-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_pre]:rounded-lg [&_pre]:p-4 [&_table]:my-4 [&_table]:w-full [&_table]:border-collapse [&_table]:overflow-hidden [&_table]:rounded-lg [&_td]:border [&_td]:border-border [&_td]:p-3 [&_td]:text-primary-foreground dark:[&_td]:text-foreground [&_th]:border [&_th]:border-border [&_th]:p-3 [&_th]:text-left [&_th]:font-semibold [&_th]:text-primary-foreground dark:[&_th]:text-foreground [&_ul]:list-disc [&_ul]:pl-6"
-                  />
+                  <div className="w-full overflow-hidden">
+                    <MarkdownPreview
+                      source={message.content}
+                      style={{
+                        backgroundColor: "transparent",
+                        color: "inherit",
+                        fontSize: "0.875rem",
+                      }}
+                      className={cn(
+                        "[&_.wmde-markdown]:bg-transparent",
+                        "[&_blockquote]:pl-4 [&_blockquote]:italic",
+                        "[&_code]:rounded [&_code]:px-1.5 [&_code]:py-0.5",
+                        "[&_li]:mb-2 [&_ol]:list-decimal [&_ol]:pl-6",
+                        "[&_pre]:rounded-lg [&_pre]:p-4",
+                        // Enhanced table styles
+                        "[&_table]:my-2 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-lg [&_table]:border [&_table]:border-border",
+                        "[&_table]:bg-background/50 [&_table]:shadow-sm",
+                        // Table header styles
+                        "[&_thead]:bg-muted/50",
+                        "[&_th]:border [&_th]:border-border [&_th]:p-2 [&_th]:text-left [&_th]:font-semibold",
+                        // Table cell styles
+                        "[&_td]:border [&_td]:border-border [&_td]:p-2 [&_td]:align-middle",
+                        // Text wrapping and overflow
+                        "[&_td]:max-w-[200px] [&_td]:break-words",
+                        "[&_th]:max-w-[200px] [&_th]:break-words",
+                        // Dark mode
+                        "dark:[&_table]:bg-background/5",
+                        "dark:[&_thead]:bg-muted/20",
+                        // Mobile optimizations
+                        "text-[13px] md:text-sm",
+                        // Ensure content is readable
+                        "prose prose-sm max-w-none dark:prose-invert",
+                        "[&_p]:mb-2 [&_p]:text-foreground",
+                        // Scrollable table container
+                        "[&_table]:block [&_table]:overflow-x-auto md:[&_table]:inline-table",
+                        "[&_table]:max-w-full",
+                        // Priority column
+                        "[&_td:first-child]:whitespace-nowrap [&_td:first-child]:font-medium",
+                        "[&_th:first-child]:whitespace-nowrap",
+                      )}
+                    />
+                  </div>
                 ) : (
-                  message.content
+                  <div className="break-words">{message.content}</div>
                 )}
               </div>
             ))
@@ -244,7 +350,9 @@ export function AIChatbox() {
         onSubmit={handleSubmit}
         className="border-t bg-background/80 p-4 backdrop-blur-sm"
       >
-        <div className="flex gap-2">
+        <div
+          className={cn("flex gap-2", isFullScreen && "mx-auto max-w-2xl px-4")}
+        >
           <Input
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
