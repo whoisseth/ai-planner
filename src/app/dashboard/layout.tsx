@@ -4,6 +4,8 @@ import { Toaster } from "@/components/ui/toaster";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
 import { AIChatbox } from "@/components/AIChatbox";
+import { getCurrentUser } from "@/lib/session";
+import { redirect } from "next/navigation";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -12,11 +14,14 @@ export const metadata: Metadata = {
   description: "Optimize Your Productivity with AI",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const user = await getCurrentUser();
+  if (!user) redirect("/sign-in");
+
   return (
     <>
       <div className="flex h-dvh overflow-hidden">
