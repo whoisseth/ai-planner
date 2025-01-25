@@ -5,7 +5,6 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Loader2,
   MessageCircle,
@@ -13,6 +12,7 @@ import {
   Maximize2,
   Minimize2,
   Square,
+  ArrowDown,
 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import MarkdownPreview from "@uiw/react-markdown-preview";
@@ -21,54 +21,116 @@ export function AIChatbox() {
   const [isOpen, setIsOpen] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const [width, setWidth] = useState(500); // Default width
+  const [width, setWidth] = useState(500);
   const [startX, setStartX] = useState(0);
   const [startWidth, setStartWidth] = useState(0);
   const chatBoxRef = useRef<HTMLDivElement>(null);
   const [chatMessages, setChatMessages] = useState<
-    Array<{ role: string; content: string; isStreaming?: boolean }>
+    Array<{ role: string; content: string; createdAt?: string; isStreaming?: boolean }>
   >([]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
-  const [abortController, setAbortController] =
-    useState<AbortController | null>(null);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [abortController, setAbortController] = useState<AbortController | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [showScrollButton, setShowScrollButton] = useState(false);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    messagesEndRef.current?.scrollIntoView({
+      behavior: isLoadingMore ? 'auto' : 'smooth'
+    });
   };
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [chatMessages]);
+  const loadMessages = async (cursor?: string | null) => {
+    console.log('Loading messages...', { cursor, isLoadingMore, isLoadingHistory });
 
-  // Load chat history when component mounts
-  useEffect(() => {
-    const loadChatHistory = async () => {
-      try {
-        const response = await fetch("/api/chat/history");
-        const data = await response.json();
-        console.table(data)
-        if (data.messages) {
-          setChatMessages(data.messages);
-        }
-      } catch (error) {
-        console.error("Failed to load chat history:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load chat history",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoadingHistory(false);
+    try {
+      const url = new URL("/api/chat/history", window.location.origin);
+      if (cursor) {
+        url.searchParams.set("cursor", cursor);
       }
-    };
+      const response = await fetch(url);
+      const data = await response.json();
+      console.log('Received messages:', data);
 
+      if (data.messages) {
+        if (cursor) {
+          const newMessages = [...data.messages];
+          newMessages.sort((a, b) =>
+            new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
+          );
+          setChatMessages(prev => [...newMessages, ...prev]);
+        } else {
+          const sortedMessages = [...data.messages].sort((a, b) =>
+            new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
+          );
+          setChatMessages(sortedMessages);
+        }
+        setHasMore(data.hasMore);
+        setNextCursor(data.nextCursor);
+      }
+    } catch (error) {
+      console.error("Failed to load chat history:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load chat history",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingHistory(false);
+      setIsLoadingMore(false);
+    }
+  };
+
+  // Load initial messages when component mounts
+  useEffect(() => {
     if (isOpen) {
-      loadChatHistory();
+      console.log('Component opened, loading initial messages');
+      setIsLoadingHistory(true);
+      loadMessages();
+    } else {
+      // Reset states when closing
+      setChatMessages([]);
+      setHasMore(false);
+      setNextCursor(null);
     }
   }, [isOpen]);
+
+  // Handle scroll to load more messages and show/hide scroll button
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const scrollContainer = e.currentTarget;
+    const { scrollTop, scrollHeight, clientHeight } = scrollContainer;
+
+    // Show scroll button when scrolled up just a little (20px)
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 20;
+    setShowScrollButton(!isAtBottom);
+
+    // Only load more if we're very close to the top (within 50px) and have more messages
+    if (scrollTop < 50 && hasMore && !isLoadingMore && !isLoadingHistory) {
+      // Calculate if we're at the absolute top
+      const isAtTop = scrollTop === 0;
+
+      if (isAtTop) {
+        console.log('At top, loading more messages...', { nextCursor });
+        setIsLoadingMore(true);
+        loadMessages(nextCursor);
+      }
+    }
+  };
+
+  // Only scroll to bottom for new messages, not for loading history or older messages
+  useEffect(() => {
+    if (chatMessages.length > 0 && !isLoadingHistory && !isLoadingMore) {
+      const lastMessage = chatMessages[chatMessages.length - 1];
+      if ((lastMessage.role === "assistant" || lastMessage.role === "user") &&
+        !lastMessage.createdAt) {
+        scrollToBottom();
+      }
+    }
+  }, [chatMessages, isLoadingHistory, isLoadingMore]);
 
   const handleStopResponse = () => {
     if (abortController) {
@@ -278,43 +340,40 @@ export function AIChatbox() {
         </div>
       </div>
 
-      <ScrollArea
+      <div
         className={cn(
-          "flex-1 overflow-y-auto p-4",
-          isDragging && "pointer-events-none", // Prevent scroll during resize
+          "flex-1 overflow-y-auto p-4 relative",
+          isDragging && "pointer-events-none",
         )}
+        onScroll={handleScroll}
       >
-        <div
-          className={cn("space-y-4", isFullScreen && "mx-auto max-w-2xl px-4")}
-        >
+        <div className={cn("space-y-4", isFullScreen && "mx-auto max-w-2xl px-4")}>
+          {/* Loading More Indicator - Move to top */}
+          {isLoadingMore && (
+            <div className="sticky top-0 flex justify-center py-2 bg-background/80 backdrop-blur-sm z-10">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          )}
+
+          {/* Messages */}
           {isLoadingHistory ? (
-            // Skeleton loading UI
             <div className="space-y-4">
               <div className="h-10 w-[60%] animate-pulse rounded-lg bg-muted" />
               <div className="ml-auto h-10 w-[80%] animate-pulse rounded-lg bg-muted" />
               <div className="h-10 w-[70%] animate-pulse rounded-lg bg-muted" />
-              <div className="h-10 w-[70%] animate-pulse rounded-lg bg-muted" />
-              <div className="ml-auto h-10 w-[75%] animate-pulse rounded-lg bg-muted" />
-              <div className="h-10 w-[70%] animate-pulse rounded-lg bg-muted" />
-              <div className="h-10 w-[70%] animate-pulse rounded-lg bg-muted" />
-              <div className="ml-auto h-10 w-[70%] animate-pulse rounded-lg bg-muted" />
             </div>
           ) : chatMessages.length === 0 ? (
             <div className="py-8 text-center text-muted-foreground">
-              <h4 className="mb-2 text-lg font-medium">
-                Welcome to AI Assistant!
-              </h4>
-              <p className="text-sm">
-                Ask me anything about your tasks, schedule, or planning needs.
-              </p>
+              <h4 className="mb-2 text-lg font-medium">Welcome to AI Assistant!</h4>
+              <p className="text-sm">Ask me anything about your tasks, schedule, or planning needs.</p>
             </div>
           ) : (
-            <div className="flex flex-col">
+            <div className="flex flex-col space-y-4">
               {chatMessages.map((message, i) => (
                 <div
                   key={i}
                   className={cn(
-                    "flex flex-col gap-2 rounded-lg px-4 py-2.5 text-sm mb-4",
+                    "flex flex-col gap-2 rounded-lg px-4 py-2.5 text-sm",
                     message.role === "user"
                       ? "ml-auto w-fit max-w-[80%] bg-primary text-primary-foreground"
                       : "mr-auto w-full bg-secondary/50 backdrop-blur-sm",
@@ -370,6 +429,8 @@ export function AIChatbox() {
               ))}
             </div>
           )}
+
+          {/* Current Message Loading */}
           {isLoading && (
             <div className="flex items-center justify-center py-2">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -377,7 +438,21 @@ export function AIChatbox() {
           )}
           <div ref={messagesEndRef} />
         </div>
-      </ScrollArea>
+
+        {/* Scroll to Bottom Button */}
+        {showScrollButton && (
+          <div className="fixed bottom-[120px] right-12 z-50">
+            <Button
+              size="icon"
+              variant="secondary"
+              className="h-10 w-10 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 hover:translate-y-[-2px]"
+              onClick={scrollToBottom}
+            >
+              <ArrowDown className="h-5 w-5" />
+            </Button>
+          </div>
+        )}
+      </div>
 
       <form
         onSubmit={handleSubmit}
