@@ -310,7 +310,7 @@ export function AIChatbox() {
       className={cn(
         "fixed z-50 flex flex-col overflow-hidden shadow-xl transition-all duration-200",
         isFullScreen || isMobile
-          ? "inset-0 h-screen w-screen rounded-none"
+          ? "inset-0 h-dvh w-screen rounded-none"
           : "bottom-4 right-4 h-[600px] max-h-[calc(100vh-2rem)] rounded-lg",
         isDragging && "select-none",
       )}
