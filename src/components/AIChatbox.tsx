@@ -6,7 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, MessageCircle, X, Maximize2, Minimize2 } from "lucide-react";
+import {
+  Loader2,
+  MessageCircle,
+  X,
+  Maximize2,
+  Minimize2,
+  Square,
+} from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import MarkdownPreview from "@uiw/react-markdown-preview";
 
@@ -24,6 +31,8 @@ export function AIChatbox() {
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [abortController, setAbortController] =
+    useState<AbortController | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -60,6 +69,22 @@ export function AIChatbox() {
     }
   }, [isOpen]);
 
+  const handleStopResponse = () => {
+    if (abortController) {
+      abortController.abort();
+      setAbortController(null);
+      setIsLoading(false);
+      // Add the last message as completed to prevent hanging state
+      setChatMessages((prev) => {
+        const lastMessage = prev[prev.length - 1];
+        if (lastMessage && lastMessage.role === "assistant") {
+          return [...prev.slice(0, -1), { ...lastMessage, isStreaming: false }];
+        }
+        return prev;
+      });
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!inputValue.trim()) return;
@@ -69,6 +94,10 @@ export function AIChatbox() {
     const userMessage = inputValue;
     setInputValue("");
 
+    // Create new AbortController for this request
+    const controller = new AbortController();
+    setAbortController(controller);
+
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
@@ -76,6 +105,7 @@ export function AIChatbox() {
         body: JSON.stringify({
           messages: [...chatMessages, { role: "user", content: userMessage }],
         }),
+        signal: controller.signal,
       });
 
       if (!response.ok) throw new Error("Failed to send message");
@@ -360,14 +390,27 @@ export function AIChatbox() {
             className="h-12 flex-1 text-base"
             disabled={isLoading}
           />
-          <Button
-            type="submit"
-            size="lg"
-            className="px-6"
-            disabled={isLoading || !inputValue.trim()}
-          >
-            Send
-          </Button>
+          {isLoading ? (
+            <Button
+              type="button"
+              size="lg"
+              variant="destructive"
+              className="gap-2 px-6"
+              onClick={handleStopResponse}
+            >
+              <Square className="h-4 w-4" />
+              Stop
+            </Button>
+          ) : (
+            <Button
+              type="submit"
+              size="lg"
+              className="px-6"
+              disabled={!inputValue.trim()}
+            >
+              Send
+            </Button>
+          )}
         </div>
       </form>
     </Card>
