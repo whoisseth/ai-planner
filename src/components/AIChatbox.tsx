@@ -24,6 +24,7 @@ export function AIChatbox() {
   const [width, setWidth] = useState(500);
   const [startX, setStartX] = useState(0);
   const [startWidth, setStartWidth] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
   const chatBoxRef = useRef<HTMLDivElement>(null);
   const [chatMessages, setChatMessages] = useState<
     Array<{ role: string; content: string; createdAt?: string; isStreaming?: boolean }>
@@ -266,10 +267,36 @@ export function AIChatbox() {
     };
   }, [isDragging, startX, startWidth]);
 
+  // Handle mobile responsiveness
+  useEffect(() => {
+    const checkMobile = () => {
+      const isMobileView = window.innerWidth < 768;
+      setIsMobile(isMobileView);
+      if (isMobileView && isOpen) {
+        setIsFullScreen(true);
+      }
+    };
+
+    // Check on mount
+    checkMobile();
+
+    // Add resize listener
+    window.addEventListener('resize', checkMobile);
+
+    return () => {
+      window.removeEventListener('resize', checkMobile);
+    };
+  }, [isOpen]);
+
   if (!isOpen) {
     return (
       <Button
-        onClick={() => setIsOpen(true)}
+        onClick={() => {
+          setIsOpen(true);
+          if (isMobile) {
+            setIsFullScreen(true);
+          }
+        }}
         className="fixed bottom-20 right-4 z-50 h-14 w-14 rounded-full p-0 shadow-lg transition-all hover:shadow-xl lg:bottom-4"
       >
         <MessageCircle className="h-6 w-6" />
@@ -281,23 +308,23 @@ export function AIChatbox() {
     <Card
       ref={chatBoxRef}
       className={cn(
-        "fixed z-50 flex flex-col overflow-hidden shadow-xl",
-        isFullScreen
-          ? "inset-0 w-full rounded-none md:inset-4 md:rounded-lg"
+        "fixed z-50 flex flex-col overflow-hidden shadow-xl transition-all duration-200",
+        isFullScreen || isMobile
+          ? "inset-0 h-screen w-screen rounded-none"
           : "bottom-4 right-4 h-[600px] max-h-[calc(100vh-2rem)] rounded-lg",
         isDragging && "select-none",
       )}
       style={
-        !isFullScreen
+        !isFullScreen && !isMobile
           ? {
-            width: `${width}px`,
-            transition: isDragging ? "none" : "width 0.3s ease-in-out",
-          }
+              width: `${width}px`,
+              transition: isDragging ? "none" : "width 0.3s ease-in-out",
+            }
           : undefined
       }
     >
       {/* Add drag handle with improved styling */}
-      {!isFullScreen && (
+      {!isFullScreen && !isMobile && (
         <div
           className="absolute left-0 top-0 h-full w-2 cursor-ew-resize hover:bg-primary/10 active:bg-primary/20"
           onMouseDown={handleMouseDown}
@@ -305,33 +332,44 @@ export function AIChatbox() {
         />
       )}
 
-      <div className="flex items-center justify-between border-b p-4">
-        <h3 className="text-lg font-semibold">AI Assistant</h3>
+      <div className={cn(
+        "flex items-center justify-between border-b p-4",
+        isFullScreen && !isMobile && "px-8 py-4"
+      )}>
+        <h3 className={cn(
+          "text-lg font-semibold",
+          isFullScreen && !isMobile && "text-xl"
+        )}>AI Assistant</h3>
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => {
-              setIsFullScreen(!isFullScreen);
-              if (!isFullScreen) {
-                setWidth(500); // Reset width when going fullscreen
-              }
-            }}
-            className="hover:bg-primary/10"
-          >
-            {isFullScreen ? (
-              <Minimize2 className="h-5 w-5" />
-            ) : (
-              <Maximize2 className="h-5 w-5" />
-            )}
-          </Button>
+          {!isMobile && (
+            <Button
+              variant="ghost"
+              size={isFullScreen ? "default" : "icon"}
+              onClick={() => {
+                setIsFullScreen(!isFullScreen);
+                if (!isFullScreen) {
+                  setWidth(500);
+                }
+              }}
+              className="hover:bg-primary/10"
+            >
+              {isFullScreen ? (
+                <div className="flex items-center gap-2">
+                  <Minimize2 className="h-4 w-4" />
+                  <span>Exit Fullscreen</span>
+                </div>
+              ) : (
+                <Maximize2 className="h-5 w-5" />
+              )}
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon"
             onClick={() => {
               setIsOpen(false);
               setIsFullScreen(false);
-              setWidth(500); // Reset width when closing
+              setWidth(500);
             }}
             className="hover:bg-primary/10"
           >
@@ -342,12 +380,16 @@ export function AIChatbox() {
 
       <div
         className={cn(
-          "flex-1 overflow-y-auto p-4 relative",
+          "flex-1 overflow-y-auto relative",
           isDragging && "pointer-events-none",
+          isFullScreen && !isMobile ? "p-6" : "p-4"
         )}
         onScroll={handleScroll}
       >
-        <div className={cn("space-y-4", isFullScreen && "mx-auto max-w-2xl px-4")}>
+        <div className={cn(
+          "space-y-4",
+          isFullScreen && "mx-auto max-w-5xl"
+        )}>
           {/* Loading More Indicator - Move to top */}
           {isLoadingMore && (
             <div className="sticky top-0 flex justify-center py-2 bg-background/80 backdrop-blur-sm z-10">
@@ -456,24 +498,36 @@ export function AIChatbox() {
 
       <form
         onSubmit={handleSubmit}
-        className="border-t bg-background/80 p-4 backdrop-blur-sm"
+        className={cn(
+          "border-t bg-background/80 backdrop-blur-sm",
+          isFullScreen && !isMobile ? "p-6" : "p-4"
+        )}
       >
         <div
-          className={cn("flex gap-2", isFullScreen && "mx-auto max-w-2xl px-4")}
+          className={cn(
+            "flex gap-3",
+            isFullScreen && "mx-auto max-w-6xl"
+          )}
         >
           <Input
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             placeholder="Type your message..."
-            className="h-12 flex-1 text-base"
+            className={cn(
+              "flex-1 text-base",
+              isFullScreen && !isMobile ? "h-12 text-base" : "h-12"
+            )}
             disabled={isLoading}
           />
           {isLoading ? (
             <Button
               type="button"
-              size="lg"
+              size={isFullScreen && !isMobile ? "default" : "default"}
               variant="destructive"
-              className="gap-2 px-6"
+              className={cn(
+                "gap-2",
+                isFullScreen && !isMobile ? "px-6 h-12" : "px-6"
+              )}
               onClick={handleStopResponse}
             >
               <Square className="h-4 w-4" />
@@ -482,8 +536,10 @@ export function AIChatbox() {
           ) : (
             <Button
               type="submit"
-              size="lg"
-              className="px-6"
+              size={isFullScreen && !isMobile ? "default" : "default"}
+              className={cn(
+                isFullScreen && !isMobile ? "px-6 h-12" : "px-6"
+              )}
               disabled={!inputValue.trim()}
             >
               Send
