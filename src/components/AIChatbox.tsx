@@ -627,18 +627,16 @@ export function AIChatbox() {
                           "[&_pre]:rounded-lg [&_pre]:p-4",
                           // Enhanced table styles
                           "[&_table]:my-2 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-lg [&_table]:border [&_table]:border-border",
-                          "[&_table]:bg-background/50 [&_table]:shadow-sm",
-                          // Table header styles
-                          "[&_thead]:bg-muted/50",
-                          "[&_th]:border [&_th]:border-border [&_th]:p-2 [&_th]:text-left [&_th]:font-semibold",
-                          // Table cell styles
-                          "[&_td]:border [&_td]:border-border [&_td]:p-2 [&_td]:align-middle",
-                          // Text wrapping and overflow
-                          "[&_td]:max-w-[200px] [&_td]:break-words",
-                          "[&_th]:max-w-[200px] [&_th]:break-words",
-                          // Dark mode
-                          "dark:[&_table]:bg-background/5",
-                          "dark:[&_thead]:bg-muted/20",
+                          // Light mode adjustments for better visibility
+                          "[&_table]:bg-white [&_table]:shadow-sm",
+                          "[&_thead]:bg-gray-100",
+                          "[&_th]:border [&_th]:border-border [&_th]:p-2 [&_th]:text-left [&_th]:font-semibold [&_th]:text-white",
+                          "[&_td]:border [&_td]:border-border [&_td]:p-2 [&_td]:align-middle [&_td]:text-white",
+                          // Dark mode adjustments for better visibility
+                          "dark:[&_table]:bg-background/20",
+                          "dark:[&_thead]:bg-muted/30",
+                          "dark:[&_th]:text-white",
+                          "dark:[&_td]:text-gray-300",
                           // Mobile optimizations
                           "text-[13px] md:text-sm",
                           // Ensure content is readable
@@ -650,6 +648,7 @@ export function AIChatbox() {
                           // Priority column
                           "[&_td:first-child]:whitespace-nowrap [&_td:first-child]:font-medium",
                           "[&_th:first-child]:whitespace-nowrap",
+                          '[&_tr]:text-primary-foreground'
                         )}
                       />
                     </div>
