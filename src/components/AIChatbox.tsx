@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Loader2,
   MessageCircle,
@@ -13,9 +13,61 @@ import {
   Minimize2,
   Square,
   ArrowDown,
+  Mic,
+  MicOff,
+  Send,
 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import MarkdownPreview from "@uiw/react-markdown-preview";
+import { speechRecognition } from "@/lib/speech-recognition";
+
+// Add Web Speech API TypeScript definitions
+interface SpeechRecognitionEvent extends Event {
+  results: SpeechRecognitionResultList;
+  resultIndex: number;
+  error: any;
+}
+
+interface SpeechRecognitionResultList {
+  length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionResult {
+  isFinal: boolean;
+  length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string;
+  confidence: number;
+}
+
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start(): void;
+  stop(): void;
+  abort(): void;
+  onerror: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => any) | null;
+  onend: ((this: SpeechRecognition, ev: Event) => any) | null;
+  onresult: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => any) | null;
+}
+
+interface SpeechRecognitionConstructor {
+  new(): SpeechRecognition;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  }
+}
 
 export function AIChatbox() {
   const [isOpen, setIsOpen] = useState(false);
@@ -38,6 +90,15 @@ export function AIChatbox() {
   const [abortController, setAbortController] = useState<AbortController | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [voiceActivity, setVoiceActivity] = useState<number[]>([]);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [audioLevel, setAudioLevel] = useState<number>(0);
+  const audioContext = useRef<AudioContext | null>(null);
+  const analyser = useRef<AnalyserNode | null>(null);
+  const mediaStream = useRef<MediaStream | null>(null);
+  const animationFrameRef = useRef<number>();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({
@@ -152,6 +213,13 @@ export function AIChatbox() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!inputValue.trim()) return;
+
+    // Stop recording if active
+    if (isRecording) {
+      speechRecognition.stopRecording();
+      setIsRecording(false);
+      setVoiceActivity([]);
+    }
 
     setIsLoading(true);
     setChatMessages((prev) => [...prev, { role: "user", content: inputValue }]);
@@ -288,6 +356,127 @@ export function AIChatbox() {
     };
   }, [isOpen]);
 
+  // Initialize speech recognition
+  useEffect(() => {
+    const init = async () => {
+      const success = await speechRecognition.initialize();
+      if (!success) {
+        console.log('Speech recognition initialization failed');
+        // Don't show error toast on initial load
+      }
+    };
+    init();
+  }, []);
+
+  // Auto-resize textarea whenever input value changes
+  const adjustTextareaHeight = () => {
+    if (textareaRef.current) {
+      const textarea = textareaRef.current;
+
+      // Reset height temporarily to get the correct scrollHeight
+      textarea.style.height = '48px';  // Start from min height
+
+      // Calculate the scroll height
+      const scrollHeight = textarea.scrollHeight;
+
+      // Set the height based on content with min/max constraints
+      const minHeight = 48;
+      const maxHeight = 300;
+
+      // Calculate new height
+      const newHeight = Math.min(Math.max(scrollHeight, minHeight), maxHeight);
+      textarea.style.height = `${newHeight}px`;
+
+      // Enable/disable scrolling based on content height
+      textarea.style.overflowY = scrollHeight > maxHeight ? 'auto' : 'hidden';
+    }
+  };
+
+  // Update the textarea onChange handler
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInputValue(e.target.value);
+    // Adjust height on next frame
+    requestAnimationFrame(adjustTextareaHeight);
+  };
+
+  // Also adjust height when receiving speech input
+  useEffect(() => {
+    if (inputValue) {
+      requestAnimationFrame(adjustTextareaHeight);
+    } else {
+      // Reset to min height when empty
+      if (textareaRef.current) {
+        textareaRef.current.style.height = '48px';
+      }
+    }
+  }, [inputValue]);
+
+  // Update the speech recognition callback
+  const toggleMicrophone = async () => {
+    if (!speechRecognition.isInitialized()) {
+      try {
+        // Try to initialize again when user explicitly clicks the mic button
+        const success = await speechRecognition.initialize();
+        if (!success) {
+          toast({
+            title: "Speech Recognition Error",
+            description: "Please ensure your browser supports speech recognition and microphone access is allowed.",
+            variant: "destructive",
+          });
+          return;
+        }
+      } catch (err) {
+        toast({
+          title: "Speech Recognition Error",
+          description: "Failed to initialize speech recognition. Please check browser compatibility.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    if (isRecording) {
+      speechRecognition.stopRecording();
+      setIsRecording(false);
+      setVoiceActivity([]);
+    } else {
+      // Clear existing input when starting new recording
+      setInputValue('');
+
+      try {
+        const success = await speechRecognition.startRecording(
+          // Visualization callback
+          (bands) => {
+            setVoiceActivity(bands);
+          },
+          // Transcription callback
+          (text) => {
+            if (text.trim()) { // Only update if we have non-empty text
+              setInputValue(text);
+            }
+          }
+        );
+
+        if (success) {
+          setIsRecording(true);
+        } else {
+          toast({
+            title: "Recording Error",
+            description: "Failed to start recording. Please check your microphone permissions.",
+            variant: "destructive",
+          });
+        }
+      } catch (err) {
+        console.error('Recording error:', err);
+        toast({
+          title: "Recording Error",
+          description: "An error occurred while recording. Please try again.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
   if (!isOpen) {
     return (
       <Button
@@ -317,9 +506,9 @@ export function AIChatbox() {
       style={
         !isFullScreen && !isMobile
           ? {
-              width: `${width}px`,
-              transition: isDragging ? "none" : "width 0.3s ease-in-out",
-            }
+            width: `${width}px`,
+            transition: isDragging ? "none" : "width 0.3s ease-in-out",
+          }
           : undefined
       }
     >
@@ -505,48 +694,164 @@ export function AIChatbox() {
       >
         <div
           className={cn(
-            "flex gap-3",
+            "flex gap-3 relative",
             isFullScreen && "mx-auto max-w-6xl"
           )}
         >
-          <Input
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Type your message..."
-            className={cn(
-              "flex-1 text-base",
-              isFullScreen && !isMobile ? "h-12 text-base" : "h-12"
+          <div className="flex-1 flex flex-col relative">
+            <Textarea
+              ref={textareaRef}
+              value={inputValue}
+              onChange={handleTextareaChange}
+              onFocus={() => {
+                if (isRecording) {
+                  speechRecognition.stopRecording();
+                  setIsRecording(false);
+                  setVoiceActivity([]);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  if (inputValue.trim()) {
+                    // Stop recording if active before submitting
+                    if (isRecording) {
+                      speechRecognition.stopRecording();
+                      setIsRecording(false);
+                      setVoiceActivity([]);
+                    }
+                    handleSubmit(e as any);
+                  }
+                }
+              }}
+              placeholder="Type your message or use the microphone..."
+              className={cn(
+                "flex-1 resize-none text-base",
+                "min-h-[48px] py-3 pr-[120px]",
+                "focus:outline-none focus:ring-1 focus:ring-primary",
+                isFullScreen && !isMobile ? "text-base" : "",
+                isRecording && "recording-active"
+              )}
+              style={{
+                transition: "height 0.2s ease-out, background-color 0.2s ease-out",
+                height: "48px", // Initial height
+              }}
+              disabled={isLoading}
+            />
+
+            {/* Voice visualization - Enhanced version */}
+            {isRecording && (
+              <div className="absolute inset-0 pointer-events-none">
+                {/* Voice activity visualization - Moved next to mic button */}
+                <div className="absolute right-[82px] top-1/2 -translate-y-1/2 flex items-center gap-[2px] h-6">
+                  {voiceActivity.map((level, i) => (
+                    <div
+                      key={i}
+                      className="voice-bar"
+                      style={{
+                        height: `${Math.min(100, level * 0.8)}%`,
+                        opacity: Math.min(1, level / 30),
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
             )}
-            disabled={isLoading}
-          />
-          {isLoading ? (
-            <Button
-              type="button"
-              size={isFullScreen && !isMobile ? "default" : "default"}
-              variant="destructive"
-              className={cn(
-                "gap-2",
-                isFullScreen && !isMobile ? "px-6 h-12" : "px-6"
+
+            {/* Overlapped buttons with enhanced recording indicator */}
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
+              <div className="relative">
+                <Button
+                  type="button"
+                  size="icon"
+                  variant={isRecording ? "destructive" : "ghost"}
+                  className={cn(
+                    "h-8 w-8 rounded-full transition-all duration-200",
+                    isRecording && "bg-red-500 text-white hover:bg-red-600"
+                  )}
+                  onClick={toggleMicrophone}
+                  disabled={isLoading}
+                >
+                  {isRecording ? (
+                    <MicOff className="h-4 w-4" />
+                  ) : (
+                    <Mic className="h-4 w-4" />
+                  )}
+                </Button>
+                {isRecording && (
+                  <div className="absolute inset-[-4px] rounded-full border-2 border-red-500/50">
+                    <div className="absolute inset-[-2px] animate-pulse-ring rounded-full border-2 border-red-500/30" />
+                  </div>
+                )}
+              </div>
+
+              {isLoading ? (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="destructive"
+                  className="h-8 w-8 rounded-full"
+                  onClick={handleStopResponse}
+                >
+                  <Square className="h-4 w-4" />
+                </Button>
+              ) : (
+                <Button
+                  type="submit"
+                  size="icon"
+                  variant="ghost"
+                  className={cn(
+                    "h-8 w-8 rounded-full transition-colors",
+                    inputValue.trim() && "text-primary hover:text-primary"
+                  )}
+                  disabled={!inputValue.trim()}
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
               )}
-              onClick={handleStopResponse}
-            >
-              <Square className="h-4 w-4" />
-              Stop
-            </Button>
-          ) : (
-            <Button
-              type="submit"
-              size={isFullScreen && !isMobile ? "default" : "default"}
-              className={cn(
-                isFullScreen && !isMobile ? "px-6 h-12" : "px-6"
-              )}
-              disabled={!inputValue.trim()}
-            >
-              Send
-            </Button>
-          )}
+            </div>
+          </div>
         </div>
       </form>
+
+      {/* Enhanced styles for voice visualization */}
+      <style jsx global>{`
+        .recording-active {
+          background-color: rgba(220, 38, 38, 0.04);
+          box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.15);
+          transition: all 0.2s ease-in-out;
+        }
+
+        .recording-active:focus {
+          box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.25);
+        }
+
+        .voice-bar {
+          width: 3px;
+          min-height: 2px;
+          border-radius: 3px;
+          transition: all 0.1s ease-in-out;
+          transform-origin: bottom;
+          background: linear-gradient(to top, rgb(239, 68, 68), rgb(248, 113, 113));
+          box-shadow: 0 0 4px rgba(239, 68, 68, 0.3);
+          animation: voice-bar-scale 0.2s ease-out;
+        }
+
+        @keyframes voice-bar-scale {
+          from { transform: scaleY(0); }
+          to { transform: scaleY(1); }
+        }
+
+        @keyframes pulse-ring {
+          0% { transform: scale(1); opacity: 0.8; }
+          50% { transform: scale(1.1); opacity: 0.4; }
+          100% { transform: scale(1); opacity: 0.8; }
+        }
+
+        .animate-pulse-ring {
+          animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+      `}</style>
     </Card>
   );
 }
