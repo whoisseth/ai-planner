@@ -413,9 +413,18 @@ export function AIChatbox() {
 
   // Update the speech recognition callback
   const toggleMicrophone = async () => {
+    if (isRecording) {
+      // Immediately stop recording when clicking the red mic button
+      speechRecognition.stopRecording();
+      setIsRecording(false);
+      setVoiceActivity([]);
+      setAudioLevel(0);
+      return; // Exit immediately after stopping
+    }
+
+    // Only try to initialize if we're starting a new recording
     if (!speechRecognition.isInitialized()) {
       try {
-        // Try to initialize again when user explicitly clicks the mic button
         const success = await speechRecognition.initialize();
         if (!success) {
           toast({
@@ -435,45 +444,39 @@ export function AIChatbox() {
       }
     }
 
-    if (isRecording) {
-      speechRecognition.stopRecording();
-      setIsRecording(false);
-      setVoiceActivity([]);
-    } else {
-      // Clear existing input when starting new recording
-      setInputValue('');
+    // Clear existing input when starting new recording
+    setInputValue('');
 
-      try {
-        const success = await speechRecognition.startRecording(
-          // Visualization callback
-          (bands) => {
-            setVoiceActivity(bands);
-          },
-          // Transcription callback
-          (text) => {
-            if (text.trim()) { // Only update if we have non-empty text
-              setInputValue(text);
-            }
+    try {
+      const success = await speechRecognition.startRecording(
+        // Visualization callback
+        (bands) => {
+          setVoiceActivity(bands);
+        },
+        // Transcription callback
+        (text) => {
+          if (text.trim()) { // Only update if we have non-empty text
+            setInputValue(text);
           }
-        );
-
-        if (success) {
-          setIsRecording(true);
-        } else {
-          toast({
-            title: "Recording Error",
-            description: "Failed to start recording. Please check your microphone permissions.",
-            variant: "destructive",
-          });
         }
-      } catch (err) {
-        console.error('Recording error:', err);
+      );
+
+      if (success) {
+        setIsRecording(true);
+      } else {
         toast({
           title: "Recording Error",
-          description: "An error occurred while recording. Please try again.",
+          description: "Failed to start recording. Please check your microphone permissions.",
           variant: "destructive",
         });
       }
+    } catch (err) {
+      console.error('Recording error:', err);
+      toast({
+        title: "Recording Error",
+        description: "An error occurred while recording. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -770,6 +773,7 @@ export function AIChatbox() {
                   )}
                   onClick={toggleMicrophone}
                   disabled={isLoading}
+                  aria-label={isRecording ? "Stop recording" : "Start recording"}
                 >
                   {isRecording ? (
                     <MicOff className="h-4 w-4" />
@@ -778,7 +782,10 @@ export function AIChatbox() {
                   )}
                 </Button>
                 {isRecording && (
-                  <div className="absolute inset-[-4px] rounded-full border-2 border-red-500/50">
+                  <div 
+                    className="absolute inset-[-4px] rounded-full border-2 border-red-500/50 cursor-pointer"
+                    onClick={toggleMicrophone}
+                  >
                     <div className="absolute inset-[-2px] animate-pulse-ring rounded-full border-2 border-red-500/30" />
                   </div>
                 )}
