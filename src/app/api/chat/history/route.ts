@@ -1,7 +1,7 @@
 import { getCurrentUser } from "@/lib/session";
 import { db } from "@/db";
 import { chatMessages } from "@/db/schema";
-import { desc } from "drizzle-orm";
+import { desc, asc } from "drizzle-orm";
 
 export async function GET() {
   try {
@@ -13,13 +13,18 @@ export async function GET() {
     // Fetch last 50 messages for the user
     const messages = await db.query.chatMessages.findMany({
       where: (messages, { eq }) => eq(messages.userId, user.id),
-      orderBy: (messages, { asc }) => [asc(messages.createdAt)],
-      limit: 200,
+      orderBy: (messages, { desc }) => [desc(messages.createdAt)],
+      limit: 20,
     });
+
+    // Get the most recent messages and sort them chronologically
+    const sortedMessages = messages
+      .slice()
+      .sort((a, b) => (a.createdAt?.getTime() ?? 0) - (b.createdAt?.getTime() ?? 0));
 
     return new Response(
       JSON.stringify({
-        messages: messages.map(msg => ({
+        messages: sortedMessages.map(msg => ({
           role: msg.role,
           content: msg.content,
         })),

@@ -49,6 +49,7 @@ export function AIChatbox() {
       try {
         const response = await fetch("/api/chat/history");
         const data = await response.json();
+        console.table(data)
         if (data.messages) {
           setChatMessages(data.messages);
         }
@@ -227,9 +228,9 @@ export function AIChatbox() {
       style={
         !isFullScreen
           ? {
-              width: `${width}px`,
-              transition: isDragging ? "none" : "width 0.3s ease-in-out",
-            }
+            width: `${width}px`,
+            transition: isDragging ? "none" : "width 0.3s ease-in-out",
+          }
           : undefined
       }
     >
@@ -308,64 +309,66 @@ export function AIChatbox() {
               </p>
             </div>
           ) : (
-            chatMessages.map((message, i) => (
-              <div
-                key={i}
-                className={cn(
-                  "flex flex-col gap-2 rounded-lg px-4 py-2.5 text-sm",
-                  message.role === "user"
-                    ? "ml-auto w-fit max-w-[80%] bg-primary text-primary-foreground"
-                    : "mr-auto w-full bg-secondary/50 backdrop-blur-sm",
-                )}
-              >
-                {message.role === "assistant" ? (
-                  <div className="w-full overflow-hidden">
-                    <MarkdownPreview
-                      source={message.content}
-                      style={{
-                        backgroundColor: "transparent",
-                        color: "inherit",
-                        fontSize: "0.875rem",
-                      }}
-                      className={cn(
-                        "[&_.wmde-markdown]:bg-transparent",
-                        "[&_blockquote]:pl-4 [&_blockquote]:italic",
-                        "[&_code]:rounded [&_code]:px-1.5 [&_code]:py-0.5",
-                        "[&_li]:mb-2 [&_ol]:list-decimal [&_ol]:pl-6",
-                        "[&_pre]:rounded-lg [&_pre]:p-4",
-                        // Enhanced table styles
-                        "[&_table]:my-2 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-lg [&_table]:border [&_table]:border-border",
-                        "[&_table]:bg-background/50 [&_table]:shadow-sm",
-                        // Table header styles
-                        "[&_thead]:bg-muted/50",
-                        "[&_th]:border [&_th]:border-border [&_th]:p-2 [&_th]:text-left [&_th]:font-semibold",
-                        // Table cell styles
-                        "[&_td]:border [&_td]:border-border [&_td]:p-2 [&_td]:align-middle",
-                        // Text wrapping and overflow
-                        "[&_td]:max-w-[200px] [&_td]:break-words",
-                        "[&_th]:max-w-[200px] [&_th]:break-words",
-                        // Dark mode
-                        "dark:[&_table]:bg-background/5",
-                        "dark:[&_thead]:bg-muted/20",
-                        // Mobile optimizations
-                        "text-[13px] md:text-sm",
-                        // Ensure content is readable
-                        "prose prose-sm max-w-none dark:prose-invert",
-                        "[&_p]:mb-2 [&_p]:text-foreground",
-                        // Scrollable table container
-                        "[&_table]:block [&_table]:overflow-x-auto md:[&_table]:inline-table",
-                        "[&_table]:max-w-full",
-                        // Priority column
-                        "[&_td:first-child]:whitespace-nowrap [&_td:first-child]:font-medium",
-                        "[&_th:first-child]:whitespace-nowrap",
-                      )}
-                    />
-                  </div>
-                ) : (
-                  <div className="break-words">{message.content}</div>
-                )}
-              </div>
-            ))
+            <div className="flex flex-col">
+              {chatMessages.map((message, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    "flex flex-col gap-2 rounded-lg px-4 py-2.5 text-sm mb-4",
+                    message.role === "user"
+                      ? "ml-auto w-fit max-w-[80%] bg-primary text-primary-foreground"
+                      : "mr-auto w-full bg-secondary/50 backdrop-blur-sm",
+                  )}
+                >
+                  {message.role === "assistant" ? (
+                    <div className="w-full overflow-hidden">
+                      <MarkdownPreview
+                        source={message.content}
+                        style={{
+                          backgroundColor: "transparent",
+                          color: "inherit",
+                          fontSize: "0.875rem",
+                        }}
+                        className={cn(
+                          "[&_.wmde-markdown]:bg-transparent",
+                          "[&_blockquote]:pl-4 [&_blockquote]:italic",
+                          "[&_code]:rounded [&_code]:px-1.5 [&_code]:py-0.5",
+                          "[&_li]:mb-2 [&_ol]:list-decimal [&_ol]:pl-6",
+                          "[&_pre]:rounded-lg [&_pre]:p-4",
+                          // Enhanced table styles
+                          "[&_table]:my-2 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-lg [&_table]:border [&_table]:border-border",
+                          "[&_table]:bg-background/50 [&_table]:shadow-sm",
+                          // Table header styles
+                          "[&_thead]:bg-muted/50",
+                          "[&_th]:border [&_th]:border-border [&_th]:p-2 [&_th]:text-left [&_th]:font-semibold",
+                          // Table cell styles
+                          "[&_td]:border [&_td]:border-border [&_td]:p-2 [&_td]:align-middle",
+                          // Text wrapping and overflow
+                          "[&_td]:max-w-[200px] [&_td]:break-words",
+                          "[&_th]:max-w-[200px] [&_th]:break-words",
+                          // Dark mode
+                          "dark:[&_table]:bg-background/5",
+                          "dark:[&_thead]:bg-muted/20",
+                          // Mobile optimizations
+                          "text-[13px] md:text-sm",
+                          // Ensure content is readable
+                          "prose prose-sm max-w-none dark:prose-invert",
+                          "[&_p]:mb-2 [&_p]:text-foreground",
+                          // Scrollable table container
+                          "[&_table]:block [&_table]:overflow-x-auto md:[&_table]:inline-table",
+                          "[&_table]:max-w-full",
+                          // Priority column
+                          "[&_td:first-child]:whitespace-nowrap [&_td:first-child]:font-medium",
+                          "[&_th:first-child]:whitespace-nowrap",
+                        )}
+                      />
+                    </div>
+                  ) : (
+                    <div className="break-words">{message.content}</div>
+                  )}
+                </div>
+              ))}
+            </div>
           )}
           {isLoading && (
             <div className="flex items-center justify-center py-2">
