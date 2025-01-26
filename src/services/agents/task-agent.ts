@@ -15,10 +15,10 @@ class CreateTaskTool extends Tool {
     try {
       const { title, dueDate, dueTime, priority } = JSON.parse(input);
 
-      const task = await createTask({
+      const task = await createTask(String(this.userId), {
         title: title.trim(),
+        description: null,
         priority: priority || "Medium",
-        completed: false,
         dueDate: dueDate ? new Date(dueDate) : null,
         dueTime: dueTime || null,
       });

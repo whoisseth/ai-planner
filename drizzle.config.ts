@@ -1,9 +1,9 @@
+import type { Config } from "drizzle-kit";
 import { config } from "dotenv";
-import { defineConfig } from "drizzle-kit";
 
 config({ path: ".env" });
 
-export default defineConfig({
+export default {
   schema: "./src/db/schema.ts",
   out: "./migrations",
   dialect: "sqlite",
@@ -12,4 +12,4 @@ export default defineConfig({
     url: process.env.DATABASE_URL!,
     authToken: process.env.DB_AUTH_TOKEN!,
   },
-});
+} satisfies Config;

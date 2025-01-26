@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { integer, text, sqliteTableCreator } from "drizzle-orm/sqlite-core";
 
 export const accountTypeEnum = ["email", "google", "github"] as const;
@@ -87,18 +88,14 @@ export const chatMessages = sqliteTable("chat_messages", {
   metadata: text("metadata"),
 });
 
-export const tasks = sqliteTable("tasks", {
+export const lists = sqliteTable("lists", {
   id: text("id").primaryKey(),
   userId: integer("user_id", { mode: "number" })
     .references(() => users.id, { onDelete: "cascade" })
     .notNull(),
-  title: text("title").notNull(),
-  completed: integer("completed", { mode: "boolean" }).notNull().default(false),
-  priority: text("priority", { enum: ["Low", "Medium", "High", "Urgent"] })
-    .notNull()
-    .default("Medium"),
-  dueDate: integer("due_date", { mode: "timestamp" }),
-  dueTime: text("due_time"),
+  name: text("name").notNull(),
+  isDefault: integer("is_default", { mode: "boolean" }).notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(0),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(
     () => new Date(),
   ),
@@ -107,12 +104,28 @@ export const tasks = sqliteTable("tasks", {
   ),
 });
 
+export const tasks = sqliteTable("tasks", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  listId: text("list_id").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  completed: integer("completed", { mode: "boolean" }).notNull().default(false),
+  starred: integer("starred", { mode: "boolean" }).notNull().default(false),
+  priority: text("priority", { enum: ["Low", "Medium", "High", "Urgent"] }).notNull().default("Medium"),
+  dueDate: integer("due_date", { mode: "timestamp" }),
+  dueTime: text("due_time"),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+});
+
 export const subtasks = sqliteTable("subtasks", {
   id: text("id").primaryKey(),
   taskId: text("task_id")
     .references(() => tasks.id, { onDelete: "cascade" })
     .notNull(),
   title: text("title").notNull(),
+  description: text("description"),
   completed: integer("completed", { mode: "boolean" }).notNull().default(false),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(
     () => new Date(),
@@ -125,5 +138,6 @@ export const subtasks = sqliteTable("subtasks", {
 export type User = typeof users.$inferSelect;
 export type Profile = typeof profiles.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
+export type List = typeof lists.$inferSelect;
 export type Task = typeof tasks.$inferSelect;
 export type SubTask = typeof subtasks.$inferSelect;

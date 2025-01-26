@@ -1,23 +1,24 @@
 "use client";
 
-import { TaskItem, type Task } from "@/components/TaskItem";
+import { TaskData } from "@/types/task";
+import { TaskItem } from "@/components/TaskItem";
 import { updateTask, deleteTask } from "@/app/actions/tasks";
 import { toast } from "sonner";
 import { useAutoAnimate } from '@formkit/auto-animate/react'
 
-
 interface TaskListProps {
-  tasks: Task[];
+  tasks: TaskData[];
+  onTasksChange?: () => void;
 }
 
-export function TaskList({ tasks }: TaskListProps) {
+export function TaskList({ tasks, onTasksChange }: TaskListProps) {
   const [animationParent] = useAutoAnimate()
 
-  async function handleUpdateTask(taskData: Task) {
+  async function handleUpdateTask(taskId: string, taskData: Partial<TaskData>) {
     try {
-      await updateTask(taskData.id, taskData);
+      await updateTask(taskId, taskData);
       toast.success("Task updated successfully");
-      // Force a refresh of the tasks list
+      onTasksChange?.();
     } catch (error) {
       toast.error("Failed to update task");
       console.error("Failed to update task:", error);
@@ -28,6 +29,7 @@ export function TaskList({ tasks }: TaskListProps) {
     try {
       await deleteTask(taskId);
       toast.success("Task deleted successfully");
+      onTasksChange?.();
     } catch (error) {
       toast.error("Failed to delete task");
     }

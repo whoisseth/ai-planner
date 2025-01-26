@@ -3,6 +3,7 @@ import { tasks } from "@/db/schema";
 import { UserId } from "@/use-cases/types";
 import { eq, and } from "drizzle-orm";
 import { Task } from "@/db/schema";
+import { nanoid } from "nanoid";
 
 export async function createTask(
   userId: UserId,
@@ -11,8 +12,8 @@ export async function createTask(
   const [task] = await db
     .insert(tasks)
     .values({
-      id: Math.random().toString(36).substr(2, 9),
-      userId,
+      id: nanoid(),
+      userId: String(userId),
       ...taskData,
     })
     .returning();
@@ -30,7 +31,7 @@ export async function updateTask(
       ...taskData,
       updatedAt: new Date(),
     })
-    .where(and(eq(tasks.id, taskId), eq(tasks.userId, userId)))
+    .where(and(eq(tasks.id, taskId), eq(tasks.userId, String(userId))))
     .returning();
 
   if (!updatedTask) {
@@ -45,7 +46,7 @@ export async function updateTask(
 export async function deleteTask(userId: UserId, taskId: string) {
   const [deletedTask] = await db
     .delete(tasks)
-    .where(and(eq(tasks.id, taskId), eq(tasks.userId, userId)))
+    .where(and(eq(tasks.id, taskId), eq(tasks.userId, String(userId))))
     .returning();
 
   if (!deletedTask) {
@@ -59,7 +60,7 @@ export async function getTasksByUserId(userId: UserId) {
   const userTasks = await db
     .select()
     .from(tasks)
-    .where(eq(tasks.userId, userId));
+    .where(eq(tasks.userId, String(userId)));
   return userTasks;
 }
 
@@ -67,7 +68,7 @@ export async function getTaskById(userId: UserId, taskId: string) {
   const task = await db
     .select()
     .from(tasks)
-    .where(eq(tasks.id, taskId) && eq(tasks.userId, userId))
+    .where(and(eq(tasks.id, taskId), eq(tasks.userId, String(userId))))
     .limit(1);
   return task[0];
 }

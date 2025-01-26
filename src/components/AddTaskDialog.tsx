@@ -9,6 +9,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,113 +20,146 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Task } from "./TaskItem";
+import { Priority } from "./TaskItem";
+import { TaskData } from "@/types/task";
 import { toast } from "sonner";
 
 interface AddTaskDialogProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onAddTask: (task: Omit<Task, "id" | "subtasks">) => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  onCreateTask: (taskData: {
+    title: string;
+    description?: string;
+    listId: string;
+    isAllDay?: boolean;
+    date?: string;
+    time?: string;
+    priority?: Priority;
+  }) => void;
+  onCreateList: (name: string) => Promise<{ id: string; name: string }>;
+  lists: { id: string; name: string }[];
 }
 
 export function AddTaskDialog({
-  isOpen,
-  onClose,
-  onAddTask,
+  open,
+  onOpenChange,
+  onCreateTask,
+  onCreateList,
+  lists,
 }: AddTaskDialogProps) {
-  const [newTask, setNewTask] = useState<
-    Omit<Task, "id" | "completed" | "subtasks">
-  >({
+  const [newTask, setNewTask] = useState({
     title: "",
-    priority: "Medium",
-    dueDate: undefined,
-    dueTime: undefined,
+    description: "",
+    listId: lists[0]?.id || "",
+    priority: "Medium" as Priority,
+    date: "",
+    time: "",
+    isAllDay: false
   });
 
   const handleAddTask = () => {
     if (newTask.title.trim()) {
-      onAddTask({
-        ...newTask,
-        completed: false,
+      onCreateTask({
+        title: newTask.title.trim(),
+        description: newTask.description.trim() || undefined,
+        listId: newTask.listId,
+        priority: newTask.priority,
+        date: newTask.date || undefined,
+        time: newTask.time || undefined,
+        isAllDay: newTask.isAllDay
       });
+      
+      // Reset form
       setNewTask({
         title: "",
+        description: "",
+        listId: lists[0]?.id || "",
         priority: "Medium",
-        dueDate: undefined,
-        dueTime: undefined,
+        date: "",
+        time: "",
+        isAllDay: false
       });
+      
       toast.success("Task added successfully");
-      onClose();
+      onOpenChange?.(false);
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Add New Task</DialogTitle>
-          <DialogDescription>
-            Create a new task for your list.
-          </DialogDescription>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] overflow-hidden flex flex-col gap-0 p-0 bg-background sm:max-w-[500px] rounded-lg border shadow-lg">
+        <DialogHeader className="p-4 flex flex-row items-center justify-between border-b">
+          <DialogTitle className="text-xl font-semibold">Add New Task</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid gap-2">
-            <Label htmlFor="title">Title</Label>
-            <Input
-              id="title"
-              value={newTask.title}
-              onChange={(e) =>
-                setNewTask({ ...newTask, title: e.target.value })
-              }
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="priority">Priority</Label>
-            <Select
-              value={newTask.priority}
-              onValueChange={(value: Task["priority"]) =>
-                setNewTask({ ...newTask, priority: value })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select priority" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Low">Low</SelectItem>
-                <SelectItem value="Medium">Medium</SelectItem>
-                <SelectItem value="High">High</SelectItem>
-                <SelectItem value="Urgent">Urgent</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="dueDate">Due Date</Label>
-            <Input
-              id="dueDate"
-              type="date"
-              onChange={(e) =>
-                setNewTask({
-                  ...newTask,
-                  dueDate: e.target.value
-                    ? new Date(e.target.value)
-                    : undefined,
-                })
-              }
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="dueTime">Due Time</Label>
-            <Input
-              id="dueTime"
-              type="time"
-              onChange={(e) =>
-                setNewTask({ ...newTask, dueTime: e.target.value })
-              }
-            />
+        <div className="flex-1 overflow-auto">
+          <div className="space-y-6 p-4">
+            <div className="grid gap-2">
+              <Input
+                id="title"
+                value={newTask.title}
+                onChange={(e) =>
+                  setNewTask({ ...newTask, title: e.target.value })
+                }
+                className="h-12"
+                placeholder="Task title"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Select
+                value={newTask.priority}
+                onValueChange={(value: TaskData["priority"]) =>
+                  setNewTask({ ...newTask, priority: value })
+                }
+              >
+                <SelectTrigger className="h-12">
+                  <SelectValue placeholder="Medium Priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Low">Low Priority</SelectItem>
+                  <SelectItem value="Medium">Medium Priority</SelectItem>
+                  <SelectItem value="High">High Priority</SelectItem>
+                  <SelectItem value="Urgent">Urgent Priority</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Input
+                id="date"
+                type="date"
+                onChange={(e) =>
+                  setNewTask({ ...newTask, date: e.target.value })
+                }
+                className="h-12"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Input
+                id="time"
+                type="time"
+                onChange={(e) =>
+                  setNewTask({ ...newTask, time: e.target.value })
+                }
+                className="h-12"
+              />
+            </div>
           </div>
         </div>
-        <DialogFooter>
-          <Button onClick={handleAddTask}>Add task</Button>
+        <DialogFooter className="p-4 border-t mt-auto">
+          <div className="flex gap-2 w-full">
+            <Button 
+              onClick={() => onOpenChange?.(false)} 
+              variant="outline"
+              className="flex-1 h-12"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleAddTask}
+              className="flex-1 h-12"
+            >
+              Add task
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

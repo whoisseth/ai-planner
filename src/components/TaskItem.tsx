@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import {
   MoreHorizontal,
   Plus,
@@ -49,47 +50,69 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { TaskEditDialog } from "./TaskEditDialog";
+import type { TaskData } from "@/types/task";
+import { SubtaskEditDialog } from "./SubtaskEditDialog";
 
 export type Priority = "Low" | "Medium" | "High" | "Urgent";
-export type SubTask = {
-  id: string;
-  title: string;
-  completed: boolean;
-};
 
-export type Task = {
+export interface SubTask {
   id: string;
+  taskId: string;
   title: string;
+  description: string | null;
   completed: boolean;
-  priority: Priority;
-  dueDate?: Date;
-  dueTime?: string;
-  subtasks: SubTask[];
-};
-
-interface TaskItemProps {
-  task: Task;
-  onUpdate: (task: Task) => void;
-  onDelete: (id: string) => void;
+  createdAt: Date | null;
+  updatedAt: Date | null;
 }
 
-export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
+export interface TaskItemProps {
+  task: TaskData;
+  onUpdate: (taskId: string, data: Partial<TaskData>) => void;
+  onDelete: (taskId: string) => void;
+  lists?: { id: string; name: string }[];
+  onCreateList?: (name: string) => Promise<{ id: string; name: string }>;
+}
+
+export function TaskItem({ task, onUpdate, onDelete, lists = [], onCreateList }: TaskItemProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isSubtaskDialogOpen, setIsSubtaskDialogOpen] = useState(false);
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [editedTask, setEditedTask] = useState(task);
   const [newSubtask, setNewSubtask] = useState("");
-  const [editingSubtaskId, setEditingSubtaskId] = useState<string | null>(null);
-  const [editedSubtaskTitle, setEditedSubtaskTitle] = useState("");
+  const [newSubtaskDescription, setNewSubtaskDescription] = useState("");
+  const [editingSubtask, setEditingSubtask] = useState<SubTask | null>(null);
 
   const handleStatusChange = () => {
-    console.log("Toggling task:", task.id, "Current status:", task.completed);
-    onUpdate({ ...task, completed: !task.completed });
+    onUpdate(task.id, {
+      completed: !task.completed,
+      description: task.description,
+      title: task.title,
+      priority: task.priority,
+      dueDate: task.dueDate,
+      dueTime: task.dueTime,
+      listId: task.listId,
+    });
   };
 
-  const handleSaveEdit = async () => {
+  const handleSaveEdit = async (taskData: {
+    title: string;
+    description?: string;
+    listId: string;
+    isAllDay?: boolean;
+    date?: string;
+    time?: string;
+    priority?: Priority;
+  }) => {
     try {
-      await onUpdate(editedTask);
+      await onUpdate(task.id, {
+        title: taskData.title,
+        description: taskData.description,
+        listId: taskData.listId,
+        dueDate: taskData.date ? new Date(taskData.date) : null,
+        dueTime: taskData.time || null,
+        priority: taskData.priority,
+      });
       setIsEditDialogOpen(false);
       toast.success("Task updated successfully");
     } catch (error) {
@@ -101,12 +124,17 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
   const handleAddSubtask = async () => {
     if (newSubtask.trim()) {
       try {
-        const subtaskData = {
-          title: newSubtask,
-          completed: false,
-        };
-        await createSubtask(task.id, subtaskData);
+        const description = newSubtaskDescription.trim();
+        const subtask = await createSubtask(task.id, newSubtask.trim(), description || undefined);
+        onUpdate(task.id, {
+          subtasks: [...task.subtasks, { 
+            ...subtask, 
+            completed: false,
+            description: description || null 
+          }],
+        });
         setNewSubtask("");
+        setNewSubtaskDescription("");
         setIsSubtaskDialogOpen(false);
         toast.success("Subtask added successfully");
       } catch (error) {
@@ -120,10 +148,24 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
     try {
       const subtask = task.subtasks.find((st) => st.id === subtaskId);
       if (subtask) {
-        await updateSubtask(task.id, subtaskId, {
+        await updateSubtask(subtaskId, {
           completed: !subtask.completed,
+          description: subtask.description,
         });
-        toast.success("Subtask updated successfully");
+        onUpdate(task.id, {
+          description: task.description,
+          title: task.title,
+          priority: task.priority,
+          dueDate: task.dueDate,
+          dueTime: task.dueTime,
+          listId: task.listId,
+          completed: task.completed,
+          subtasks: task.subtasks.map((st) =>
+            st.id === subtaskId
+              ? { ...st, completed: !st.completed }
+              : st
+          ),
+        });
       }
     } catch (error) {
       toast.error("Failed to update subtask");
@@ -131,33 +173,31 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
     }
   };
 
-  const handleEditSubtask = (subtaskId: string) => {
-    const subtask = task.subtasks.find((st) => st.id === subtaskId);
-    if (subtask) {
-      setEditingSubtaskId(subtaskId);
-      setEditedSubtaskTitle(subtask.title);
-    }
-  };
-
-  const handleSaveSubtaskEdit = async () => {
-    if (editingSubtaskId && editedSubtaskTitle.trim()) {
-      try {
-        await updateSubtask(task.id, editingSubtaskId, {
-          title: editedSubtaskTitle,
-        });
-        setEditingSubtaskId(null);
-        setEditedSubtaskTitle("");
-        toast.success("Subtask updated successfully");
-      } catch (error) {
-        toast.error("Failed to update subtask");
-        console.error("Failed to update subtask:", error);
-      }
+  const handleUpdateSubtask = async (subtaskId: string, data: { title: string; description: string | null }) => {
+    try {
+      await updateSubtask(subtaskId, {
+        ...data,
+      });
+      onUpdate(task.id, {
+        subtasks: task.subtasks.map((st) =>
+          st.id === subtaskId
+            ? { ...st, ...data }
+            : st
+        ),
+      });
+      toast.success("Subtask updated successfully");
+    } catch (error) {
+      toast.error("Failed to update subtask");
+      console.error("Failed to update subtask:", error);
     }
   };
 
   const handleDeleteSubtask = async (subtaskId: string) => {
     try {
-      await deleteSubtask(task.id, subtaskId);
+      await deleteSubtask(subtaskId);
+      onUpdate(task.id, {
+        subtasks: task.subtasks.filter((st) => st.id !== subtaskId),
+      });
       toast.success("Subtask deleted successfully");
     } catch (error) {
       toast.error("Failed to delete subtask");
@@ -166,7 +206,7 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
   };
 
   return (
-    <div className="group relative flex items-start gap-3 border-b py-2 last:border-b-0 hover:bg-accent/5 px-1">
+    <div className="group relative flex items-start gap-3 border-b border-border/40 py-3 last:border-b-0 hover:bg-accent/5 px-2 sm:px-3 transition-colors">
       <TooltipProvider delayDuration={50}>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -176,8 +216,8 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
                 onCheckedChange={handleStatusChange}
                 id={`task-${task.id}`}
                 className={cn(
-                  "h-[18px] w-[18px] rounded-full border-2 transition-colors cursor-pointer",
-                  task.completed ? "bg-primary border-primary" : "border-muted-foreground/20 hover:border-primary/50 group-hover:border-primary/50"
+                  "h-5 w-5 sm:h-[18px] sm:w-[18px] rounded-full border-2 transition-all duration-200 cursor-pointer",
+                  task.completed ? "bg-primary border-primary scale-105" : "border-muted-foreground/20 hover:border-primary/50 group-hover:border-primary/50"
                 )}
               />
             </div>
@@ -187,310 +227,207 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 flex-wrap">
-          <label
-            htmlFor={`task-${task.id}`}
-            className={cn(
-              "text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 truncate cursor-pointer",
-              task.completed && "text-muted-foreground/50 line-through",
-            )}
-          >
-            {task.title}
-          </label>
+      
+      <div className="min-w-0 flex-1 flex items-start justify-between gap-2">
+        <div className="flex-1 space-y-1">
           <div className="flex items-center gap-2">
-            <span
-              className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium", {
-                "bg-red-100/90 text-red-700 dark:bg-red-900/40 dark:text-red-300":
-                  task.priority === "Urgent",
-                "bg-yellow-100/90 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300":
-                  task.priority === "High",
-                "bg-blue-100/90 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300":
-                  task.priority === "Medium",
-                "bg-gray-100/90 text-gray-700 dark:bg-gray-900/40 dark:text-gray-300":
-                  task.priority === "Low",
-              })}
+            <label
+              htmlFor={`task-${task.id}`}
+              className={cn(
+                "text-sm font-medium leading-tight peer-disabled:cursor-not-allowed peer-disabled:opacity-70 break-words cursor-pointer transition-colors duration-200",
+                task.completed && "text-muted-foreground/50 line-through"
+              )}
+              onDoubleClick={() => setIsEditDialogOpen(true)}
             >
-              {task.priority}
-            </span>
-            {(task.dueDate || task.dueTime) && (
-              <span className="flex items-center gap-1 text-[10px] text-muted-foreground/80 bg-muted/50 px-2 py-0.5 rounded-full">
-                <svg className="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10"/>
-                  <polyline points="12 6 12 12 16 14"/>
-                </svg>
-                <span>
-                  {task.dueDate && format(task.dueDate, "MMM d")}
-                  {task.dueTime && format(new Date(`2000/01/01 ${task.dueTime}`), " h:mm a")}
-                </span>
+              {task.title}
+            </label>
+            <div className="flex items-center gap-1.5">
+              <span
+                className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors", {
+                  "bg-red-100/90 text-red-700 dark:bg-red-900/40 dark:text-red-300":
+                    task.priority === "Urgent",
+                  "bg-yellow-100/90 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300":
+                    task.priority === "High",
+                  "bg-blue-100/90 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300":
+                    task.priority === "Medium",
+                  "bg-gray-100/90 text-gray-700 dark:bg-gray-900/40 dark:text-gray-300":
+                    task.priority === "Low",
+                })}
+              >
+                {task.priority}
               </span>
-            )}
+              {(task.dueDate || task.dueTime) && (
+                <span className="flex items-center gap-1 text-[10px] text-muted-foreground/80 bg-muted/50 px-2 py-0.5 rounded-full">
+                  <Calendar className="h-2.5 w-2.5" />
+                  <span>
+                    {task.dueDate && format(task.dueDate, "MMM d")}
+                    {task.dueTime && format(new Date(`2000/01/01 ${task.dueTime}`), " h:mm a")}
+                  </span>
+                </span>
+              )}
+            </div>
           </div>
-        </div>
-        {task.subtasks.length > 0 && (
-          <div className="ml-0.5 mt-1.5 space-y-1">
-            {task.subtasks.map((subtask) => (
-              <div key={subtask.id} className="flex items-center gap-2 group/subtask">
-                <TooltipProvider delayDuration={50}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="relative flex items-center justify-center">
-                        <Checkbox
-                          checked={subtask.completed}
-                          onCheckedChange={() => handleSubtaskStatusChange(subtask.id)}
-                          id={`subtask-${subtask.id}`}
-                          className={cn(
-                            "h-3.5 w-3.5 rounded-full border-[1.5px] transition-colors cursor-pointer",
-                            subtask.completed ? "bg-primary/90 border-primary/90" : "border-muted-foreground/20 hover:border-primary/40 group-hover:border-primary/40"
-                          )}
-                        />
+          {task.description && (
+            <p className="text-sm text-muted-foreground">{task.description}</p>
+          )}
+          {task.subtasks.length > 0 && (
+            <div className="mt-2 space-y-2">
+              {task.subtasks.map((subtask) => (
+                <div key={subtask.id} className="group flex items-start gap-3 pl-2">
+                  <Checkbox
+                    checked={subtask.completed}
+                    onCheckedChange={() => handleSubtaskStatusChange(subtask.id)}
+                    id={`subtask-${subtask.id}`}
+                    className={cn(
+                      "h-4 w-4 rounded-full border-2 transition-all duration-200 cursor-pointer",
+                      subtask.completed ? "bg-primary border-primary" : "border-muted-foreground/20"
+                    )}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <label
+                        htmlFor={`subtask-${subtask.id}`}
+                        className={cn(
+                          "text-sm leading-tight cursor-pointer",
+                          subtask.completed && "text-muted-foreground/50 line-through"
+                        )}
+                      >
+                        {subtask.title}
+                      </label>
+                      <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => setEditingSubtask(subtask)}
+                        >
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-destructive"
+                          onClick={() => handleDeleteSubtask(subtask.id)}
+                        >
+                          <Trash className="h-3 w-3" />
+                        </Button>
                       </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="text-xs font-medium">
-                      Mark {subtask.completed ? 'incomplete' : 'completed'}
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                <label
-                  htmlFor={`subtask-${subtask.id}`}
-                  className={cn(
-                    "flex-grow text-[11px] truncate",
-                    subtask.completed && "text-muted-foreground/50 line-through",
-                  )}
-                >
-                  {subtask.title}
-                </label>
-                <div className="flex opacity-0 group-hover/subtask:opacity-100 transition-opacity">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-4 w-4 p-0"
-                    onClick={() => handleEditSubtask(subtask.id)}
-                  >
-                    <Edit className="h-2.5 w-2.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-4 w-4 p-0 text-red-500/70 hover:text-red-600"
-                    onClick={() => handleDeleteSubtask(subtask.id)}
-                  >
-                    <Trash className="h-2.5 w-2.5" />
-                  </Button>
+                    </div>
+                    {subtask.description && (
+                      <p className="text-sm text-muted-foreground mt-1">{subtask.description}</p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-      <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0 hover:bg-accent/50"
-            >
-              <MoreHorizontal className="h-4 w-4" />
-              <span className="sr-only">More</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-[180px]">
-            <DropdownMenuItem onClick={() => setIsSubtaskDialogOpen(true)} className="text-sm py-2.5 px-3">
-              <Plus className="mr-2 h-4 w-4" />
-              Add subtask
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setIsEditDialogOpen(true)} className="text-sm py-2.5 px-3">
-              <Edit className="mr-2 h-4 w-4" />
-              Edit task
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setIsDetailsDialogOpen(true)} className="text-sm py-2.5 px-3">
-              <Info className="mr-2 h-4 w-4" />
-              View details
-            </DropdownMenuItem>
-            <DropdownMenuSeparator className="my-1" />
-            <DropdownMenuItem
-              className="text-destructive text-sm py-2.5 px-3"
-              onClick={() => onDelete(task.id)}
-            >
-              <Trash className="mr-2 h-4 w-4" />
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+              ))}
+            </div>
+          )}
+        </div>
+        
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+            onClick={() => setIsEditDialogOpen(true)}
+          >
+            <Edit className="h-3.5 w-3.5 text-muted-foreground/70" />
+            <span className="sr-only">Edit task</span>
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+            onClick={() => setIsSubtaskDialogOpen(true)}
+          >
+            <Plus className="h-3.5 w-3.5 text-muted-foreground/70" />
+            <span className="sr-only">Add subtask</span>
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity text-red-600/70 hover:text-red-600"
+            onClick={() => onDelete(task.id)}
+          >
+            <Trash className="h-3.5 w-3.5" />
+            <span className="sr-only">Delete task</span>
+          </Button>
+        </div>
       </div>
 
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Edit Task</DialogTitle>
-            <DialogDescription>
-              Make changes to your task here.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="title">Title</Label>
-              <Input
-                id="title"
-                value={editedTask.title}
-                onChange={(e) =>
-                  setEditedTask({ ...editedTask, title: e.target.value })
-                }
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="priority">Priority</Label>
-              <Select
-                value={editedTask.priority}
-                onValueChange={(value: Priority) =>
-                  setEditedTask({ ...editedTask, priority: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select priority" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Low">Low</SelectItem>
-                  <SelectItem value="Medium">Medium</SelectItem>
-                  <SelectItem value="High">High</SelectItem>
-                  <SelectItem value="Urgent">Urgent</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="dueDate">Due Date</Label>
-              <Input
-                id="dueDate"
-                type="date"
-                value={
-                  editedTask.dueDate
-                    ? format(editedTask.dueDate, "yyyy-MM-dd")
-                    : ""
-                }
-                onChange={(e) =>
-                  setEditedTask({
-                    ...editedTask,
-                    dueDate: e.target.value
-                      ? new Date(e.target.value)
-                      : undefined,
-                  })
-                }
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="dueTime">Due Time</Label>
-              <Input
-                id="dueTime"
-                type="time"
-                value={editedTask.dueTime || ""}
-                onChange={(e) =>
-                  setEditedTask({ ...editedTask, dueTime: e.target.value })
-                }
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button onClick={handleSaveEdit}>Save changes</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <TaskEditDialog
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+        task={{
+          ...task,
+          dueDate: task.dueDate || null
+        }}
+        lists={lists}
+        onUpdate={handleSaveEdit}
+        onCreateList={onCreateList}
+      />
 
       <Dialog open={isSubtaskDialogOpen} onOpenChange={setIsSubtaskDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Add Subtask</DialogTitle>
-            <DialogDescription>
-              Add a new subtask to "{task.title}"
-            </DialogDescription>
+        <DialogContent className="max-h-[90vh] overflow-hidden flex flex-col gap-0 p-0 bg-background sm:max-w-[500px] rounded-lg border shadow-lg">
+          <DialogHeader className="p-4 flex flex-row items-center justify-between border-b">
+            <DialogTitle className="text-xl font-semibold">Add Subtask</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="subtask">Subtask Title</Label>
-              <Input
-                id="subtask"
-                value={newSubtask}
-                onChange={(e) => setNewSubtask(e.target.value)}
-              />
+          <div className="flex-1 overflow-auto">
+            <div className="space-y-6 p-4">
+              <div className="grid gap-2">
+                <Input
+                  id="subtask"
+                  placeholder="Enter subtask title"
+                  value={newSubtask}
+                  onChange={(e) => setNewSubtask(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleAddSubtask();
+                    }
+                  }}
+                  className="h-12"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Textarea
+                  id="subtaskDescription"
+                  placeholder="Add description"
+                  value={newSubtaskDescription}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNewSubtaskDescription(e.target.value)}
+                  className="min-h-[120px] resize-none"
+                />
+              </div>
             </div>
           </div>
-          <DialogFooter>
-            <Button onClick={handleAddSubtask}>Add subtask</Button>
+          <DialogFooter className="p-4 border-t mt-auto">
+            <div className="flex gap-2 w-full">
+              <Button 
+                variant="outline" 
+                onClick={() => setIsSubtaskDialogOpen(false)}
+                className="flex-1 "
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleAddSubtask} 
+                disabled={!newSubtask.trim()}
+                className="flex-1 "
+              >
+                Add Subtask
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Task Details</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div>
-              <Label className="font-bold">Title</Label>
-              <p>{task.title}</p>
-            </div>
-            <div>
-              <Label className="font-bold">Priority</Label>
-              <p>{task.priority}</p>
-            </div>
-            <div>
-              <Label className="font-bold">Due Date</Label>
-              <p>
-                {task.dueDate
-                  ? format(task.dueDate, "MMMM d, yyyy")
-                  : "Not set"}
-              </p>
-            </div>
-            <div>
-              <Label className="font-bold">Due Time</Label>
-              <p>{task.dueTime || "Not set"}</p>
-            </div>
-            <div>
-              <Label className="font-bold">Status</Label>
-              <p>{task.completed ? "Completed" : "Active"}</p>
-            </div>
-            {task.subtasks.length > 0 && (
-              <div>
-                <Label className="font-bold">Subtasks</Label>
-                <ul className="list-disc pl-5">
-                  {task.subtasks.map((subtask) => (
-                    <li
-                      key={subtask.id}
-                      className={subtask.completed ? "line-through" : ""}
-                    >
-                      {subtask.title}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-      <Dialog
-        open={!!editingSubtaskId}
-        onOpenChange={() => setEditingSubtaskId(null)}
-      >
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Edit Subtask</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="editSubtask">Subtask Title</Label>
-              <Input
-                id="editSubtask"
-                value={editedSubtaskTitle}
-                onChange={(e) => setEditedSubtaskTitle(e.target.value)}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button onClick={handleSaveSubtaskEdit}>Save changes</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {editingSubtask && (
+        <SubtaskEditDialog
+          open={!!editingSubtask}
+          onOpenChange={(open) => !open && setEditingSubtask(null)}
+          subtask={editingSubtask}
+          onUpdate={(data) => handleUpdateSubtask(editingSubtask.id, data)}
+        />
+      )}
     </div>
   );
 }
