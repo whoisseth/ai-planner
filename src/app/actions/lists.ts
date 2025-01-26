@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { lists } from "@/db/schema";
 import { getCurrentUser } from "@/lib/session";
 import { nanoid } from "nanoid";
-import { eq } from "drizzle-orm";
+import { eq, asc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { ListData } from "@/types/task";
 
@@ -57,15 +57,21 @@ export async function deleteList(listId: string): Promise<void> {
 }
 
 export async function getLists(): Promise<ListData[]> {
+  const user = await getCurrentUser();
+  if (!user) {
+    throw new Error("Not authenticated");
+  }
+
   const listsData = await db
     .select()
     .from(lists)
     .where(eq(lists.userId, user.id))
-    .orderBy(lists.sortOrder)
-    .all();
+    .orderBy(asc(lists.sortOrder));
 
-  return listsData.map(list => ({
+  return listsData.map((list): ListData => ({
     ...list,
-    userId: String(list.userId)
+    userId: String(list.userId),
+    createdAt: list.createdAt ? new Date(list.createdAt) : null,
+    updatedAt: list.updatedAt ? new Date(list.updatedAt) : null,
   }));
 } 

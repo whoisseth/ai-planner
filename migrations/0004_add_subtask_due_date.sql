@@ -1,0 +1,2 @@
+ALTER TABLE subtasks ADD COLUMN due_date INTEGER;
+ALTER TABLE subtasks ADD COLUMN due_time TEXT; 

@@ -26,10 +26,18 @@ export default function ListsPage() {
 
   useEffect(() => {
     const loadData = async () => {
-      const [listsData, tasksData] = await Promise.all([getLists(), getTasks()]);
-      setLists(listsData);
-      setTasks(tasksData);
+      try {
+        const [listsData, tasksData] = await Promise.all([
+          getLists(),
+          getTasks()
+        ]);
+        setLists(listsData);
+        setTasks(tasksData);
+      } catch (error) {
+        console.error("Failed to load data:", error);
+      }
     };
+
     loadData();
   }, []);
 

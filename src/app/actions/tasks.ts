@@ -1,10 +1,10 @@
 "use server";
 
 import { db } from "@/db";
-import { tasks, subtasks } from "@/db/schema";
+import { tasks, subtasks, type SubTask } from "@/db/schema";
 import { getCurrentUser } from "@/lib/session";
 import { nanoid } from "nanoid";
-import { eq, inArray, and } from "drizzle-orm";
+import { eq, inArray, and, desc, asc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { SubTaskData, TaskData } from "@/types/task";
 
@@ -18,17 +18,26 @@ export async function createTask(
     priority?: "Low" | "Medium" | "High" | "Urgent";
   }
 ): Promise<TaskData> {
+  const user = await getCurrentUser();
+  if (!user) {
+    throw new Error("Not authenticated");
+  }
+
   const task = await db
     .insert(tasks)
     .values({
       id: nanoid(),
-      userId: "1", // Temporary user ID
-      listId,
+      userId: String(user.id),
+      listId: listId || '1', // Use default list if none provided
       title: data.title,
       description: data.description,
       dueDate: data.dueDate,
       dueTime: data.dueTime,
-      priority: data.priority,
+      priority: data.priority || "Medium",
+      completed: false,
+      starred: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     })
     .returning()
     .get();
@@ -69,11 +78,13 @@ export async function updateTask(
     subtasks: subtasksData.map(s => ({
       ...s,
       createdAt: s.createdAt ? new Date(s.createdAt) : null,
-      updatedAt: s.updatedAt ? new Date(s.updatedAt) : null
+      updatedAt: s.updatedAt ? new Date(s.updatedAt) : null,
+      dueDate: null,
+      dueTime: null
     })),
-    dueDate: task.dueDate ? new Date(task.dueDate) : null,
     createdAt: task.createdAt ? new Date(task.createdAt) : null,
-    updatedAt: task.updatedAt ? new Date(task.updatedAt) : null
+    updatedAt: task.updatedAt ? new Date(task.updatedAt) : null,
+    dueDate: task.dueDate ? new Date(task.dueDate) : null,
   };
 }
 
@@ -89,25 +100,16 @@ export async function deleteTask(taskId: string): Promise<void> {
 }
 
 export async function getTasks(): Promise<TaskData[]> {
+  const user = await getCurrentUser();
+  if (!user) {
+    throw new Error("Not authenticated");
+  }
+
   const tasksData = await db
-    .select({
-      id: tasks.id,
-      title: tasks.title,
-      description: tasks.description,
-      completed: tasks.completed,
-      starred: tasks.starred,
-      priority: tasks.priority,
-      dueDate: tasks.dueDate,
-      dueTime: tasks.dueTime,
-      listId: tasks.listId,
-      userId: tasks.userId,
-      createdAt: tasks.createdAt,
-      updatedAt: tasks.updatedAt,
-    })
+    .select()
     .from(tasks)
-    .where(eq(tasks.userId, "1")) // Temporary user ID
-    .groupBy(tasks.id)
-    .all();
+    .where(eq(tasks.userId, String(user.id)))
+    .orderBy(desc(tasks.createdAt));
 
   const tasksWithSubtasks = await Promise.all(
     tasksData.map(async (task) => {
@@ -115,18 +117,20 @@ export async function getTasks(): Promise<TaskData[]> {
         .select()
         .from(subtasks)
         .where(eq(subtasks.taskId, task.id))
-        .all();
+        .orderBy(asc(subtasks.createdAt));
 
       return {
         ...task,
         subtasks: subtasksData.map(s => ({
           ...s,
           createdAt: s.createdAt ? new Date(s.createdAt) : null,
-          updatedAt: s.updatedAt ? new Date(s.updatedAt) : null
+          updatedAt: s.updatedAt ? new Date(s.updatedAt) : null,
+          dueDate: s.dueDate ? new Date(s.dueDate) : null,
+          dueTime: s.dueTime || null
         })),
-        dueDate: task.dueDate ? new Date(task.dueDate) : null,
         createdAt: task.createdAt ? new Date(task.createdAt) : null,
-        updatedAt: task.updatedAt ? new Date(task.updatedAt) : null
+        updatedAt: task.updatedAt ? new Date(task.updatedAt) : null,
+        dueDate: task.dueDate ? new Date(task.dueDate) : null,
       };
     })
   );
@@ -168,52 +172,64 @@ export async function getStarredTasks(): Promise<TaskData[]> {
   }));
 }
 
-export async function createSubtask(taskId: string, title: string, description?: string): Promise<SubTaskData> {
-  const user = await getCurrentUser();
-  if (!user) {
-    throw new Error("Not authenticated");
-  }
-
-  const subtask = await db
-    .insert(subtasks)
-    .values({
-      id: nanoid(),
-      taskId,
-      title,
-      description,
-      completed: false,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    })
-    .returning()
-    .get();
-
-  revalidatePath("/");
-  return { ...subtask, description: description || null };
+export async function createSubtask(taskId: string, title: string, description?: string) {
+  const id = nanoid();
+  const now = new Date();
+  
+  const subtask = await db.insert(subtasks).values({
+    id,
+    taskId,
+    title,
+    description: description || null,
+    completed: false,
+    dueDate: null,
+    dueTime: null,
+    createdAt: now,
+    updatedAt: now,
+  }).returning();
+  
+  const result = subtask[0];
+  return {
+    id: result.id,
+    taskId: result.taskId,
+    title: result.title,
+    description: result.description,
+    completed: result.completed,
+    dueDate: result.dueDate,
+    dueTime: result.dueTime,
+    createdAt: result.createdAt,
+    updatedAt: result.updatedAt,
+  } as SubTaskData;
 }
 
-export async function updateSubtask(subtaskId: string, data: Partial<{
-  title: string;
-  description: string | null;
-  completed: boolean;
-}>): Promise<SubTaskData> {
-  const user = await getCurrentUser();
-  if (!user) {
-    throw new Error("Not authenticated");
-  }
-  
+export async function updateSubtask(subtaskId: string, data: Partial<SubTaskData>) {
+  const updateData = {
+    ...(data.title !== undefined && { title: data.title }),
+    ...(data.description !== undefined && { description: data.description }),
+    ...(data.completed !== undefined && { completed: data.completed }),
+    ...(data.dueDate !== undefined && { dueDate: data.dueDate }),
+    ...(data.dueTime !== undefined && { dueTime: data.dueTime }),
+    updatedAt: new Date(),
+  };
+
   const subtask = await db
     .update(subtasks)
-    .set({
-      ...data,
-      updatedAt: new Date(),
-    })
+    .set(updateData)
     .where(eq(subtasks.id, subtaskId))
-    .returning()
-    .get();
-
-  revalidatePath("/");
-  return subtask;
+    .returning();
+    
+  const result = subtask[0];
+  return {
+    id: result.id,
+    taskId: result.taskId,
+    title: result.title,
+    description: result.description,
+    completed: result.completed,
+    dueDate: result.dueDate,
+    dueTime: result.dueTime,
+    createdAt: result.createdAt,
+    updatedAt: result.updatedAt,
+  } as SubTaskData;
 }
 
 export async function deleteSubtask(subtaskId: string): Promise<void> {

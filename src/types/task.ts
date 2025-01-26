@@ -6,6 +6,8 @@ export interface SubTaskData {
   title: string;
   description: string | null;
   completed: boolean;
+  dueDate: Date | null;
+  dueTime: string | null;
   createdAt: Date | null;
   updatedAt: Date | null;
 }

@@ -90,24 +90,18 @@ export const chatMessages = sqliteTable("chat_messages", {
 
 export const lists = sqliteTable("lists", {
   id: text("id").primaryKey(),
-  userId: integer("user_id", { mode: "number" })
-    .references(() => users.id, { onDelete: "cascade" })
-    .notNull(),
+  userId: integer("user_id").notNull(),
   name: text("name").notNull(),
   isDefault: integer("is_default", { mode: "boolean" }).notNull().default(false),
   sortOrder: integer("sort_order").notNull().default(0),
-  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(
-    () => new Date(),
-  ),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(
-    () => new Date(),
-  ),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
 });
 
 export const tasks = sqliteTable("tasks", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull(),
-  listId: text("list_id").notNull(),
+  listId: text("list_id").notNull().references(() => lists.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   description: text("description"),
   completed: integer("completed", { mode: "boolean" }).notNull().default(false),
@@ -121,18 +115,14 @@ export const tasks = sqliteTable("tasks", {
 
 export const subtasks = sqliteTable("subtasks", {
   id: text("id").primaryKey(),
-  taskId: text("task_id")
-    .references(() => tasks.id, { onDelete: "cascade" })
-    .notNull(),
+  taskId: text("task_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   description: text("description"),
   completed: integer("completed", { mode: "boolean" }).notNull().default(false),
-  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(
-    () => new Date(),
-  ),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(
-    () => new Date(),
-  ),
+  dueDate: integer("due_date", { mode: "timestamp" }),
+  dueTime: text("due_time"),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
 });
 
 export type User = typeof users.$inferSelect;

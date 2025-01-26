@@ -14,7 +14,7 @@ async function runMigrations() {
       console.log("Drizzle migration failed, trying manual SQL execution");
       
       // If drizzle migration fails, try executing the SQL directly
-      const migrationPath = join(process.cwd(), "migrations", "0002_add_subtask_description.sql");
+      const migrationPath = join(process.cwd(), "migrations", "0000_init.sql");
       const sqlContent = readFileSync(migrationPath, "utf8");
       
       // Split the SQL into individual statements
