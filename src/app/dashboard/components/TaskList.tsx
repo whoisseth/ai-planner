@@ -3,12 +3,16 @@
 import { TaskItem, type Task } from "@/components/TaskItem";
 import { updateTask, deleteTask } from "@/app/actions/tasks";
 import { toast } from "sonner";
+import { useAutoAnimate } from '@formkit/auto-animate/react'
+
 
 interface TaskListProps {
   tasks: Task[];
 }
 
 export function TaskList({ tasks }: TaskListProps) {
+  const [animationParent] = useAutoAnimate()
+
   async function handleUpdateTask(taskData: Task) {
     try {
       await updateTask(taskData.id, taskData);
@@ -30,7 +34,7 @@ export function TaskList({ tasks }: TaskListProps) {
   }
 
   return (
-    <div className="space-y-4">
+    <div ref={animationParent} className="space-y-4">
       {tasks.map((task) => (
         <TaskItem
           key={task.id}
