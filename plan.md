@@ -188,3 +188,4 @@ The AI-Powered Daily Planner is a comprehensive productivity application designe
 2. OAuth credentials
 3. Email service setup
 4. API keys management
+

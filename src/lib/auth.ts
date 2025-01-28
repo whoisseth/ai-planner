@@ -1,3 +1,8 @@
+/**
+ * @file auth.ts
+ * @description Authentication utilities and middleware
+ */
+
 import { GitHub, Google } from "arctic";
 import { db } from "@/db";
 import {
@@ -11,18 +16,20 @@ import { sha256 } from "@oslojs/crypto/sha2";
 import { UserId } from "@/use-cases/types";
 import { getSessionToken } from "@/lib/session";
 
-const SESSION_REFRESH_INTERVAL_MS = 1000 * 60 * 60 * 24 * 15;
+// Constants
+const SESSION_REFRESH_INTERVAL_MS = 1000 * 60 * 60 * 24 * 15; // 15 days
 const SESSION_MAX_DURATION_MS = SESSION_REFRESH_INTERVAL_MS * 2;
 
+// OAuth providers
 export const github = new GitHub(
   env.GITHUB_CLIENT_ID,
-  env.GITHUB_CLIENT_SECRET,
+  env.GITHUB_CLIENT_SECRET
 );
 
 export const googleAuth = new Google(
   env.GOOGLE_CLIENT_ID,
   env.GOOGLE_CLIENT_SECRET,
-  `${env.HOST_NAME}/api/login/google/callback`,
+  `${env.HOST_NAME}/api/login/google/callback`
 );
 
 export function generateSessionToken(): string {
@@ -34,67 +41,59 @@ export function generateSessionToken(): string {
 
 export async function createSession(
   token: string,
-  userId: number,
+  userId: string,
 ): Promise<Session> {
   const sessionId = encodeHexLowerCase(sha256(new TextEncoder().encode(token)));
   const session: Session = {
     id: sessionId,
     userId,
-    expiresAt: Date.now() + SESSION_MAX_DURATION_MS,
+    expiresAt: new Date(Date.now() + SESSION_MAX_DURATION_MS),
   };
   await db.insert(sessions).values(session);
   return session;
 }
 
-export async function validateRequest(): Promise<SessionValidationResult> {
-  const sessionToken = await getSessionToken();
-  if (!sessionToken) {
-    return { session: null, user: null };
-  }
-  return validateSessionToken(sessionToken);
-}
+export async function validateSession(request: Request): Promise<{ user: User; session: Session } | null> {
+  const sessionId = request.headers.get("Authorization")?.split(" ")[1] ?? null;
+  if (!sessionId) return null;
 
-export async function validateSessionToken(
-  token: string,
-): Promise<SessionValidationResult> {
-  const sessionId = encodeHexLowerCase(sha256(new TextEncoder().encode(token)));
-  const sessionInDb = await db.query.sessions.findFirst({
-    where: eq(sessions.id, sessionId),
+  const session = await db.query.sessions.findFirst({
+    where: eq(sessions.id, sessionId)
   });
-  if (!sessionInDb) {
-    return { session: null, user: null };
+
+  if (!session || session.expiresAt < new Date()) {
+    if (session) {
+      await invalidateSession(session.id);
+    }
+    return null;
   }
-  if (Date.now() >= sessionInDb.expiresAt) {
-    await db.delete(sessions).where(eq(sessions.id, sessionInDb.id));
-    return { session: null, user: null };
-  }
+
   const user = await db.query.users.findFirst({
-    where: eq(users.id, sessionInDb.userId),
+    where: eq(users.id, session.userId)
   });
 
   if (!user) {
-    await db.delete(sessions).where(eq(sessions.id, sessionInDb.id));
-    return { session: null, user: null };
+    await invalidateSession(session.id);
+    return null;
   }
 
-  if (Date.now() >= sessionInDb.expiresAt - SESSION_REFRESH_INTERVAL_MS) {
-    sessionInDb.expiresAt = Date.now() + SESSION_MAX_DURATION_MS;
-    await db
-      .update(sessions)
-      .set({
-        expiresAt: sessionInDb.expiresAt,
-      })
-      .where(eq(sessions.id, sessionInDb.id));
+  // Refresh session if needed
+  if (session.expiresAt.getTime() - Date.now() < SESSION_REFRESH_INTERVAL_MS) {
+    session.expiresAt = new Date(Date.now() + SESSION_MAX_DURATION_MS);
+    await db.update(sessions)
+      .set({ expiresAt: session.expiresAt })
+      .where(eq(sessions.id, session.id));
   }
-  return { session: sessionInDb, user };
+
+  return { user, session };
 }
 
 export async function invalidateSession(sessionId: string): Promise<void> {
   await db.delete(sessions).where(eq(sessions.id, sessionId));
 }
 
-export async function invalidateUserSessions(userId: UserId): Promise<void> {
-  await db.delete(sessions).where(eq(users.id, userId));
+export async function invalidateUserSessions(userId: string): Promise<void> {
+  await db.delete(sessions).where(eq(sessions.userId, userId));
 }
 
 export type SessionValidationResult =

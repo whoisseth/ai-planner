@@ -10,6 +10,9 @@ export interface SubTaskData {
   dueTime: string | null;
   createdAt: Date | null;
   updatedAt: Date | null;
+  deletedAt: Date | null;
+  isDeleted: boolean;
+  sortOrder: number;
 }
 
 export type TaskData = {
@@ -26,6 +29,9 @@ export type TaskData = {
   userId: string;
   createdAt: Date | null;
   updatedAt: Date | null;
+  deletedAt: Date | null;
+  isDeleted: boolean;
+  sortOrder: number;
 };
 
 export interface ListData {
@@ -34,4 +40,9 @@ export interface ListData {
   userId: string;
   createdAt: Date | null;
   updatedAt: Date | null;
+  deletedAt: Date | null;
+  isDeleted: boolean;
+  sortOrder: number;
+  isDefault?: boolean;
+  isStarred?: boolean;
 } 
