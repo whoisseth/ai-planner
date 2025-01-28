@@ -19,6 +19,7 @@
   "dependencies": {
     "@aws-sdk/client-ses": "^3.731.1",
     "@formkit/auto-animate": "^0.8.2",
+    "@hello-pangea/dnd": "^17.0.0",
     "@hookform/resolvers": "^3.4.2",
     "@langchain/cohere": "^0.3.2",
     "@langchain/community": "^0.3.26",
