@@ -1,6 +1,7 @@
 ## Core Relationships
 
 1. User -> Lists: One-to-Many
+
    - Each user can have multiple lists
    - System lists created on account creation:
      - Default list (editable, non-deletable)
@@ -9,6 +10,7 @@
    - Lists have a sortOrder property for drag and drop support
 
 2. List -> Tasks: One-to-Many
+
    - Each list contains multiple tasks
    - Tasks can be moved between lists
    - Tasks are linked to lists via `listId`
@@ -16,6 +18,7 @@
    - Completed tasks can be automatically moved to Done list
 
 3. Task -> Subtasks: Self-Referential One-to-Many
+
    - Tasks can have multiple subtasks through self-referential relationship
    - Both tasks and subtasks share the same table/schema
    - Differentiated by `type` field: "main" or "sub"
@@ -23,12 +26,14 @@
    - Cascade deletion from parent to subtasks
 
 4. Task -> Tags: Many-to-Many
+
    - Tasks can have multiple tags
    - Tags can be applied to multiple tasks
    - Implemented through task_tags junction table
    - Tags are user-specific with unique names per user
 
 5. Task -> Task Dependencies: Many-to-Many
+
    - Tasks can depend on multiple tasks
    - Tasks can be prerequisites for multiple tasks
    - Implemented through task_dependencies junction table
@@ -42,46 +47,44 @@
 ## Schema Details
 
 1. Tasks Table:
+
    - Core Fields:
      - `id`: Primary key (text)
      - `userId`: Foreign key to user (text)
      - `listId`: Foreign key to list with cascade delete (text)
      - `title`: Required task title (text)
      - `description`: Optional description (text)
-   
    - Organization:
      - `type`: "main" or "sub" to distinguish tasks/subtasks
      - `parentId`: Self-reference to parent task (for subtasks)
      - `starred`: Boolean flag for starred tasks
      - `completed`: Boolean completion status
      - `sortOrder`: Integer for ordering within list
-   
    - Time Management:
      - `dueDate`: Optional timestamp
      - `dueTime`: Optional time string
      - `reminder`: JSON object for reminders {
-         time: timestamp,
-         type: ["email" | "push" | "both"],
-         notifiedAt: timestamp | null,
-         recurrence: {
-           frequency: ["none" | "daily" | "weekly" | "monthly" | "yearly"],
-           interval: number,
-           daysOfWeek?: number[],
-           endDate?: timestamp,
-           count?: number
-         }
+       time: timestamp,
+       type: ["email" | "push" | "both"],
+       notifiedAt: timestamp | null,
+       recurrence: {
+       frequency: ["none" | "daily" | "weekly" | "monthly" | "yearly"],
+       interval: number,
+       daysOfWeek?: number[],
+       endDate?: timestamp,
+       count?: number
+       }
        }
      - `createdAt`: Auto-set creation timestamp
      - `updatedAt`: Auto-updated modification timestamp
-   
    - Priority:
      - `priority`: Enum ("Low", "Medium", "High", "Urgent")
-   
    - Soft Deletion:
      - `deletedAt`: Optional timestamp
      - `isDeleted`: Boolean flag
 
 2. Lists Table:
+
    - `id`: Primary key (text)
    - `userId`: Foreign key to user (text)
    - `name`: List name (text)
@@ -95,22 +98,23 @@
    - Timestamps
 
 3. Templates Table:
+
    - `id`: Primary key (text)
    - `userId`: Foreign key to user (text)
    - `name`: Template name (text)
    - `description`: Optional description (text)
    - `settings`: JSON object {
-       title?: string,
-       description?: string,
-       priority?: "Low" | "Medium" | "High" | "Urgent",
-       tags?: string[],
-       reminder?: ReminderConfig,
-       recurrence?: RecurrenceConfig,
-       estimatedDuration?: number,
-       defaultSubtasks?: {
-         title: string,
-         description?: string
-       }[]
+     title?: string,
+     description?: string,
+     priority?: "Low" | "Medium" | "High" | "Urgent",
+     tags?: string[],
+     reminder?: ReminderConfig,
+     recurrence?: RecurrenceConfig,
+     estimatedDuration?: number,
+     defaultSubtasks?: {
+     title: string,
+     description?: string
+     }[]
      }
    - `usageCount`: Integer for template usage tracking
    - `lastUsed`: Timestamp of last usage
@@ -119,16 +123,17 @@
    - `updatedAt`: Update timestamp
 
 4. Notifications Table:
+
    - `id`: Primary key (text)
    - `userId`: Foreign key to user (text)
    - `taskId`: Foreign key to tasks (text)
    - `type`: Enum (
-       "reminder" | 
-       "dependency_blocked" | 
-       "dependency_unblocked" | 
-       "task_completed" | 
-       "task_assigned" | 
-       "due_soon"
+     "reminder" |
+     "dependency_blocked" |
+     "dependency_unblocked" |
+     "task_completed" |
+     "task_assigned" |
+     "due_soon"
      )
    - `status`: Enum ("pending" | "sent" | "read" | "failed")
    - `channel`: Enum ("email" | "push" | "both")
@@ -140,6 +145,7 @@
    - `updatedAt`: Update timestamp
 
 5. Tags Table:
+
    - `id`: Primary key (text)
    - `userId`: Foreign key to user (text)
    - `name`: Tag name (text)
@@ -151,6 +157,7 @@
    - UNIQUE constraint on (userId, name)
 
 6. TaskTags Junction Table:
+
    - `taskId`: Foreign key to tasks
    - `tagId`: Foreign key to tags
    - `createdAt`: Timestamp when tag was added
@@ -170,12 +177,14 @@
 ## System Lists
 
 1. Default List:
+
    - Created automatically for each user
    - Name is editable
    - Cannot be deleted
    - `isDefault: true`
 
 2. Starred List:
+
    - Created automatically for each user
    - Name is not editable
    - Cannot be deleted
@@ -191,6 +200,7 @@
 ## Smart Algorithms
 
 1. Tag Suggestions:
+
    - Content-Based Analysis:
      - Extract keywords from task title and description
      - Match against existing tag names
@@ -208,6 +218,7 @@
      - Context relevance score
 
 2. Task Template Suggestions:
+
    - Usage Frequency Analysis:
      - Track template usage patterns
      - Consider time-of-day/week patterns
@@ -238,6 +249,7 @@
 ## Notification System
 
 1. Notification Types:
+
    - Task Reminders:
      - Due date approaching
      - Start time reminder
@@ -256,6 +268,7 @@
      - Recurring task creation
 
 2. Notification Channels:
+
    - Email:
      - HTML formatted
      - Action buttons
@@ -270,6 +283,7 @@
      - Notification inbox
 
 3. Notification Processing:
+
    - Scheduling:
      - Priority-based queuing
      - Rate limiting
@@ -300,20 +314,24 @@
 ## Implementation Notes
 
 1. Authentication Integration:
+
    - Use user ID from authentication system
    - All queries must include user ID for data isolation
 
 2. Default Data Creation:
+
    - Create all system lists on user registration
    - Set appropriate flags for system lists
 
 3. Task Management:
+
    - Automatic task movement to Done list on completion (optional setting)
    - Dependency validation before task completion
    - Recurring task creation based on recurrence pattern
    - Smart completion date suggestions based on dependencies
 
 4. Data Integrity:
+
    - Cascade deletions for lists -> tasks
    - Cascade deletions for tasks -> subtasks
    - Cascade deletions for tasks <-> tags
@@ -324,35 +342,40 @@
 
 5. Database Indexes:
    Primary Indexes:
+
    - Tasks: id (PRIMARY KEY)
    - Lists: id (PRIMARY KEY)
    - Tags: id (PRIMARY KEY)
-   
+
    Foreign Key Indexes:
+
    - Tasks: userId, listId, parentId
    - Lists: userId
    - Tags: userId
    - TaskTags: taskId, tagId
-   
+
    Compound Indexes:
+
    - Tasks: (userId, listId) for filtered queries
    - Tasks: (userId, completed) for done list queries
    - TaskTags: (taskId, tagId) for relationship queries
-   
+
    Performance Indexes:
+
    - Tasks: type for task/subtask filtering
    - Tasks: reminder for reminder queries
    - Tasks: deletedAt for cleanup
    - Tasks: isDeleted for active item filtering
    - Lists: sortOrder for list ordering
    - Tasks: sortOrder for task ordering
-   Additional Indexes:
+     Additional Indexes:
    - Tasks: (userId, reminder->time) for reminder processing
    - TaskDependencies: (prerequisiteTaskId) for dependency checks
    - Tags: (userId, name) for unique constraint
    - Tags: (userId, usageCount) for tag suggestions
 
 6. Reminder System:
+
    - JSON-based reminder configuration
    - Multiple notification channels (email, push)
    - Recurring reminder patterns
@@ -360,6 +383,7 @@
    - Timezone handling
 
 7. Tag System:
+
    - User-specific tags with unique names
    - Color coding support
    - Usage statistics for smart suggestions
@@ -371,6 +395,7 @@
      - Time-based patterns (e.g., daily, weekly tasks)
 
 8. Recurrence System:
+
    - Flexible recurrence patterns
    - Support for daily, weekly, monthly, yearly
    - Custom intervals and end conditions
@@ -387,23 +412,27 @@
 ## Soft Deletion Strategy
 
 1. Deleted Items Retention:
+
    - All entities (Tasks, Lists, Tags) support soft deletion
    - Deleted items are kept in DB for 15 days
    - Automatic cleanup after 15 days via scheduled job
 
 2. Soft Deletion Fields (All Tables):
+
    - `deletedAt`: Timestamp when item was deleted
    - `isDeleted`: Boolean flag for deletion status
    - Items with `isDeleted = true` are hidden from normal queries
    - Items are physically removed after retention period
 
 3. Cleanup Process:
+
    - Daily scheduled job to check for expired deleted items
    - Items deleted > 15 days ago are physically removed
    - Cascading physical deletion for related items
    - Cleanup job runs during off-peak hours
 
 4. Recovery Process:
+
    - Items can be restored within 15-day window
    - Restoration preserves all relationships
    - Restoration validates referential integrity
@@ -417,11 +446,13 @@
 ## AI Integration
 
 1. Core AI Components:
+
    - Groq API: Primary LLM for natural language processing and task management
    - Cohere: Embeddings generation for semantic search and task analysis
    - Pinecone: Vector database for storing and querying embeddings
 
 2. AI Chat System:
+
    - Chat History Management:
      - Store conversation history with metadata
      - Track context and user preferences
@@ -437,6 +468,7 @@
      - Template creation and application
 
 3. Vector Database Schema (Pinecone):
+
    - Collections:
      - Task Embeddings:
        - Vector: Cohere embedding of task content
@@ -457,6 +489,7 @@
          - type: Message type (user/assistant)
 
 4. AI-Powered Features:
+
    - Semantic Task Search:
      - Natural language query understanding
      - Context-aware task retrieval
@@ -478,6 +511,7 @@
      - Workflow optimization
 
 5. AI Integration Points:
+
    - Task Creation:
      - Natural language parsing
      - Smart field population
@@ -498,7 +532,9 @@
      - Priority adjustment
 
 6. Implementation Details:
+
    - API Integration:
+
      - Groq API:
        - Model: mixtral-8x7b-32768
        - Context window: 32k tokens
@@ -513,7 +549,9 @@
          - Pods: p1.x1 (scalable)
 
    - Data Flow:
+
      - Chat Processing:
+
        1. User input received
        2. Context retrieval from Pinecone
        3. Groq processing with context
@@ -530,6 +568,7 @@
        6. Vector database update
 
 7. Security Considerations:
+
    - API Key Management:
      - Secure storage of API keys
      - Rate limiting
@@ -559,6 +598,7 @@
 ## Vercel AI SDK Implementation
 
 1. SDK Setup and Configuration:
+
    - Core Dependencies:
      ```json
      {
@@ -575,136 +615,143 @@
      - PINECONE_API_KEY
 
 2. AI Provider Setup:
+
    - Groq Configuration:
+
      ```typescript
-     import { createGroq } from '@ai-sdk/groq';
-     
+     import { createGroq } from "@ai-sdk/groq";
+
      const groq = createGroq({
        apiKey: process.env.GROQ_API_KEY,
        // Optional custom settings
        headers: {
-         'Custom-Header': 'value'
-       }
+         "Custom-Header": "value",
+       },
      });
-     
+
      // Initialize model
-     const model = groq('mixtral-8x7b-32768');
+     const model = groq("mixtral-8x7b-32768");
      ```
 
 3. UI Components Integration:
+
    - Chat Interface:
+
      ```typescript
-     import { useChat } from 'ai/react';
-     
+     import { useChat } from "ai/react";
+
      export function ChatComponent() {
        const { messages, input, handleInputChange, handleSubmit } = useChat({
-         api: '/api/chat',
+         api: "/api/chat",
          initialMessages: [],
          onResponse: (response) => {
            // Handle streaming response
          },
          onFinish: (message) => {
            // Handle completion
-         }
-       });
-     }
-     ```
-   
-   - Task Completion:
-     ```typescript
-     import { useCompletion } from 'ai/react';
-     
-     export function TaskCreation() {
-       const {
-         completion,
-         input,
-         handleInputChange,
-         handleSubmit
-       } = useCompletion({
-         api: '/api/task-create',
-         onFinish: (result) => {
-           // Handle task creation completion
-         }
+         },
        });
      }
      ```
 
-4. API Route Implementation:
-   - Chat Endpoint:
+   - Task Completion:
+
      ```typescript
-     import { StreamingTextResponse } from 'ai';
-     
+     import { useCompletion } from "ai/react";
+
+     export function TaskCreation() {
+       const { completion, input, handleInputChange, handleSubmit } =
+         useCompletion({
+           api: "/api/task-create",
+           onFinish: (result) => {
+             // Handle task creation completion
+           },
+         });
+     }
+     ```
+
+4. API Route Implementation:
+
+   - Chat Endpoint:
+
+     ```typescript
+     import { StreamingTextResponse } from "ai";
+
      export async function POST(req: Request) {
        const { messages } = await req.json();
        const response = await model.chat({
          messages,
          temperature: 0.7,
-         maxTokens: 500
+         maxTokens: 500,
        });
-       
+
        return new StreamingTextResponse(response);
      }
      ```
-   
+
    - Task Creation Endpoint:
+
      ```typescript
-     import { StreamingTextResponse, createDataStream } from 'ai';
-     
+     import { StreamingTextResponse, createDataStream } from "ai";
+
      export async function POST(req: Request) {
        const { prompt } = await req.json();
        const taskStream = await model.generateText({
          prompt,
-         temperature: 0.3
+         temperature: 0.3,
        });
-       
+
        const dataStream = createDataStream(taskStream, {
          onData: async (data) => {
            // Process task data
            await createTask(data);
-         }
+         },
        });
-       
+
        return new StreamingTextResponse(dataStream);
      }
      ```
 
 5. Advanced Features:
+
    - Reasoning Extraction:
+
      ```typescript
      import {
        experimental_wrapLanguageModel as wrapLanguageModel,
-       extractReasoningMiddleware
-     } from 'ai';
-     
+       extractReasoningMiddleware,
+     } from "ai";
+
      const enhancedModel = wrapLanguageModel({
-       model: groq('mixtral-8x7b-32768'),
-       middleware: extractReasoningMiddleware({ tagName: 'think' })
+       model: groq("mixtral-8x7b-32768"),
+       middleware: extractReasoningMiddleware({ tagName: "think" }),
      });
      ```
-   
+
    - Custom Data Streaming:
+
      ```typescript
-     import { createDataStream, StreamingTextResponse } from 'ai';
-     
+     import { createDataStream, StreamingTextResponse } from "ai";
+
      const stream = createDataStream(response, {
        experimental_streamData: true,
        onData: (data) => {
          // Process custom data
-       }
+       },
      });
      ```
 
 6. Error Handling:
+
    - Client-Side:
      ```typescript
      const { messages, error } = useChat({
        onError: (error) => {
-         console.error('Chat error:', error);
+         console.error("Chat error:", error);
          // Handle error appropriately
-       }
+       },
      });
      ```
-   
    - Server-Side:
      ```typescript
      try {
@@ -712,13 +759,14 @@
        return new StreamingTextResponse(response);
      } catch (error) {
        return new Response(
-         JSON.stringify({ error: 'Failed to process request' }),
-         { status: 500 }
+         JSON.stringify({ error: "Failed to process request" }),
+         { status: 500 },
        );
      }
      ```
 
 7. Message Persistence:
+
    - Database Integration:
      ```typescript
      const { messages } = useChat({
@@ -727,12 +775,11 @@
            content: message.content,
            role: message.role,
            // Generate embedding using Cohere
-           embedding: await generateEmbedding(message.content)
+           embedding: await generateEmbedding(message.content),
          });
-       }
+       },
      });
      ```
-   
    - Context Management:
      ```typescript
      const { messages } = useChat({
@@ -740,8 +787,8 @@
        body: {
          // Additional context for API route
          taskId: currentTaskId,
-         userId: session.user.id
-       }
+         userId: session.user.id,
+       },
      });
      ```
 
@@ -762,4 +809,4 @@
 relationship.md file
 follow the ' relationship.md file' And create further features
 alwsasys do propper commenting for the code and the file.
-alwsy use pnpm to intsll any package 
+alwsy use pnpm to intsll any package

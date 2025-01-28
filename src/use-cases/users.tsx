@@ -52,10 +52,16 @@ export async function deleteUserUseCase(
 }
 
 export async function getUserProfileUseCase(userId: UserId) {
-  const profile = await getProfile(userId);
+  let profile = await getProfile(userId);
 
   if (!profile) {
-    throw new NotFoundError();
+    // Create a default profile if none exists
+    const defaultDisplayName = await generateRandomName();
+    profile = await createProfile(userId, defaultDisplayName);
+    
+    if (!profile) {
+      throw new Error("Failed to create default profile");
+    }
   }
 
   return profile;

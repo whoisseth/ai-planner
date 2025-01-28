@@ -13,8 +13,8 @@ import { Session, sessions, User, users } from "@/db/schema";
 import { env } from "@/env";
 import { eq } from "drizzle-orm";
 import { sha256 } from "@oslojs/crypto/sha2";
-import { UserId } from "@/use-cases/types";
 import { getSessionToken } from "@/lib/session";
+import type { UserId } from "@/lib/session";
 
 // Constants
 const SESSION_REFRESH_INTERVAL_MS = 1000 * 60 * 60 * 24 * 15; // 15 days
@@ -39,9 +39,15 @@ export function generateSessionToken(): string {
   return token;
 }
 
+/**
+ * Creates a new session for a user
+ * @param token - The session token
+ * @param userId - The user's ID
+ * @returns The created session
+ */
 export async function createSession(
   token: string,
-  userId: string,
+  userId: UserId,
 ): Promise<Session> {
   const sessionId = encodeHexLowerCase(sha256(new TextEncoder().encode(token)));
   const session: Session = {
@@ -53,10 +59,16 @@ export async function createSession(
   return session;
 }
 
+/**
+ * Validates a session from a request
+ * @param request - The request to validate
+ * @returns The user and session if valid, null otherwise
+ */
 export async function validateSession(request: Request): Promise<{ user: User; session: Session } | null> {
-  const sessionId = request.headers.get("Authorization")?.split(" ")[1] ?? null;
-  if (!sessionId) return null;
+  const token = await getSessionToken();
+  if (!token) return null;
 
+  const sessionId = encodeHexLowerCase(sha256(new TextEncoder().encode(token)));
   const session = await db.query.sessions.findFirst({
     where: eq(sessions.id, sessionId)
   });
@@ -88,11 +100,19 @@ export async function validateSession(request: Request): Promise<{ user: User; s
   return { user, session };
 }
 
+/**
+ * Invalidates a session by ID
+ * @param sessionId - The ID of the session to invalidate
+ */
 export async function invalidateSession(sessionId: string): Promise<void> {
   await db.delete(sessions).where(eq(sessions.id, sessionId));
 }
 
-export async function invalidateUserSessions(userId: string): Promise<void> {
+/**
+ * Invalidates all sessions for a user
+ * @param userId - The ID of the user whose sessions to invalidate
+ */
+export async function invalidateUserSessions(userId: UserId): Promise<void> {
   await db.delete(sessions).where(eq(sessions.userId, userId));
 }
 

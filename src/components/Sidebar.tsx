@@ -11,6 +11,7 @@ import {
   ListTodo,
   BarChart2,
   Settings,
+  Copy,
 } from "lucide-react";
 
 const sidebarItems = [
@@ -56,6 +57,25 @@ export default function Sidebar() {
                 </Link>
               </Button>
             ))}
+            <Button
+              variant="ghost"
+              className={cn(
+                "justify-start",
+                pathname === "/dashboard/templates" && "bg-muted",
+              )}
+              asChild
+            >
+              <Link
+                href="/dashboard/templates"
+                className={cn(
+                  "w-full justify-start gap-2",
+                  pathname === "/dashboard/templates" && "bg-muted",
+                )}
+              >
+                <Copy className="h-4 w-4" />
+                Templates
+              </Link>
+            </Button>
           </nav>
         </ScrollArea>
       </div>

@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { MoreHorizontal, Plus, Trash, Calendar, Edit, Info, ChevronDown, ChevronUp, Check, X, CheckCircle2, Clock } from "lucide-react"
+import { MoreHorizontal, Plus, Trash, Calendar, Edit, Info, ChevronDown, ChevronUp, Check, X, CheckCircle2, Clock, Link2, Copy } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,12 +30,15 @@ import { Label } from "@/components/ui/label"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { toast } from "sonner"
+import { toast } from "@/components/ui/use-toast"
 import { createSubtask, updateSubtask, deleteSubtask } from "@/app/actions/tasks"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { TaskEditDialog } from "./TaskEditDialog"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import type { TaskData } from "@/types/task"
+import { TaskDependenciesModal } from "@/components/TaskDependenciesModal"
+import { Template } from "@/db/schema"
+import { applyTemplate, getTemplates, createTemplate } from "@/services/templates"
 
 export type Priority = "Low" | "Medium" | "High" | "Urgent"
 
@@ -57,9 +60,10 @@ export interface TaskItemProps {
   onDelete: (taskId: string) => void
   lists?: { id: string; name: string }[]
   onCreateList?: (name: string) => Promise<{ id: string; name: string }>
+  allTasks: TaskData[]
 }
 
-export function TaskItem({ task, onUpdate, onDelete, lists = [], onCreateList }: TaskItemProps) {
+export function TaskItem({ task, onUpdate, onDelete, lists = [], onCreateList, allTasks }: TaskItemProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isSubtaskDialogOpen, setIsSubtaskDialogOpen] = useState(false)
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false)
@@ -83,6 +87,11 @@ export function TaskItem({ task, onUpdate, onDelete, lists = [], onCreateList }:
   const [editingSubtaskDescription, setEditingSubtaskDescription] = useState<string | null>(null)
   const [isSubtaskDueDateDialogOpen, setIsSubtaskDueDateDialogOpen] = useState(false)
   const [selectedSubtaskId, setSelectedSubtaskId] = useState<string | null>(null)
+  const [showDependencies, setShowDependencies] = useState(false)
+  const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false)
+  const [templates, setTemplates] = useState<Template[]>([])
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false)
+  const [isCreatingTemplate, setIsCreatingTemplate] = useState(false)
   const titleRef = useRef<HTMLDivElement>(null)
   const descriptionRef = useRef<HTMLDivElement>(null)
   const subtaskTitleRef = useRef<HTMLDivElement>(null)
@@ -119,9 +128,15 @@ export function TaskItem({ task, onUpdate, onDelete, lists = [], onCreateList }:
         priority: taskData.priority,
       })
       setIsEditDialogOpen(false)
-      toast.success("Task updated successfully")
+      toast({
+        title: "Task updated successfully",
+      })
     } catch (error) {
-      toast.error("Failed to update task")
+      toast({
+        title: "Error",
+        description: "Failed to update task",
+        variant: "destructive",
+      })
       console.error("Failed to update task:", error)
     }
   }
@@ -146,9 +161,15 @@ export function TaskItem({ task, onUpdate, onDelete, lists = [], onCreateList }:
         setNewSubtaskDescription("")
         setQuickAddSubtask("")
         setIsSubtaskDialogOpen(false)
-        toast.success("Subtask added successfully")
+        toast({
+          title: "Subtask added successfully",
+        })
       } catch (error) {
-        toast.error("Failed to add subtask")
+        toast({
+          title: "Error",
+          description: "Failed to add subtask",
+          variant: "destructive",
+        })
         console.error("Failed to add subtask:", error)
       }
     }
@@ -174,7 +195,11 @@ export function TaskItem({ task, onUpdate, onDelete, lists = [], onCreateList }:
         })
       }
     } catch (error) {
-      toast.error("Failed to update subtask")
+      toast({
+        title: "Error",
+        description: "Failed to update subtask",
+        variant: "destructive",
+      })
       console.error("Failed to update subtask:", error)
     }
   }
@@ -187,7 +212,11 @@ export function TaskItem({ task, onUpdate, onDelete, lists = [], onCreateList }:
         subtasks: task.subtasks.map((st) => (st.id === subtaskId ? { ...st, ...data } : st)),
       })
     } catch (error) {
-      toast.error("Failed to update subtask")
+      toast({
+        title: "Error",
+        description: "Failed to update subtask",
+        variant: "destructive",
+      })
       console.error("Failed to update subtask:", error)
     }
   }
@@ -198,9 +227,15 @@ export function TaskItem({ task, onUpdate, onDelete, lists = [], onCreateList }:
       onUpdate(task.id, {
         subtasks: task.subtasks.filter((st) => st.id !== subtaskId),
       })
-      toast.success("Subtask deleted successfully")
+      toast({
+        title: "Subtask deleted successfully",
+      })
     } catch (error) {
-      toast.error("Failed to delete subtask")
+      toast({
+        title: "Error",
+        description: "Failed to delete subtask",
+        variant: "destructive",
+      })
       console.error("Failed to delete subtask:", error)
     }
   }
@@ -285,7 +320,11 @@ export function TaskItem({ task, onUpdate, onDelete, lists = [], onCreateList }:
         })
       }
     } catch (error) {
-      toast.error("Failed to update subtask due date")
+      toast({
+        title: "Error",
+        description: "Failed to update subtask due date",
+        variant: "destructive",
+      })
       console.error("Failed to update subtask due date:", error)
     }
   }
@@ -318,6 +357,52 @@ export function TaskItem({ task, onUpdate, onDelete, lists = [], onCreateList }:
         dueDate: selectedDate,
         dueTime: checked ? null : selectedTime
       });
+    }
+  };
+
+  const handleApplyTemplate = async (templateId: string) => {
+    try {
+      await applyTemplate(templateId, task.listId);
+      // Refresh tasks after applying template
+      onUpdate?.(task.id, {});
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to apply template",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCreateTemplate = async () => {
+    try {
+      setIsCreatingTemplate(true);
+      const template = await createTemplate({
+        name: task.title,
+        description: task.description || undefined,
+        settings: {
+          title: task.title,
+          description: task.description || undefined,
+          priority: task.priority,
+          defaultSubtasks: task.subtasks?.map((subtask) => ({
+            title: subtask.title,
+            description: subtask.description || undefined,
+          })),
+        },
+        isPublic: false,
+      });
+      toast({
+        title: "Success",
+        description: "Template created successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create template",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreatingTemplate(false);
     }
   };
 
@@ -364,6 +449,28 @@ export function TaskItem({ task, onUpdate, onDelete, lists = [], onCreateList }:
       selection?.addRange(range)
     }
   }, [editingSubtaskDescription])
+
+  useEffect(() => {
+    if (isTemplateDialogOpen) {
+      const loadTemplates = async () => {
+        setIsLoadingTemplates(true);
+        try {
+          const templates = await getTemplates();
+          setTemplates(templates);
+        } catch (error) {
+          toast({
+            title: "Error",
+            description: "Failed to load templates",
+            variant: "destructive",
+          });
+        } finally {
+          setIsLoadingTemplates(false);
+        }
+      };
+
+      loadTemplates();
+    }
+  }, [isTemplateDialogOpen]);
 
   return (
     <div className="group relative flex flex-col gap-3 border-b border-border/40 py-3 last:border-b-0 hover:bg-accent/5 px-2 sm:px-3 transition-colors">
@@ -489,6 +596,20 @@ export function TaskItem({ task, onUpdate, onDelete, lists = [], onCreateList }:
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setIsDetailsDialogOpen(true)} className="gap-2">
                     <Info className="h-4 w-4" /> View details
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setShowDependencies(true)} className="gap-2">
+                    <Link2 className="h-4 w-4" /> Manage dependencies
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setIsTemplateDialogOpen(true)} className="gap-2">
+                    <Copy className="h-4 w-4" /> Apply Template
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={handleCreateTemplate}
+                    disabled={isCreatingTemplate}
+                    className="gap-2"
+                  >
+                    <Copy className="h-4 w-4" />
+                    {isCreatingTemplate ? "Creating Template..." : "Save as Template"}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => onDelete(task.id)} className="text-destructive gap-2">
@@ -918,6 +1039,57 @@ export function TaskItem({ task, onUpdate, onDelete, lists = [], onCreateList }:
               </Button>
             </div>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <TaskDependenciesModal
+        task={task}
+        isOpen={showDependencies}
+        onClose={() => setShowDependencies(false)}
+        allTasks={allTasks}
+      />
+
+      <Dialog open={isTemplateDialogOpen} onOpenChange={setIsTemplateDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Apply Template</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {isLoadingTemplates ? (
+              <div className="flex justify-center">
+                <span>Loading templates...</span>
+              </div>
+            ) : templates.length === 0 ? (
+              <div className="text-center">
+                <p className="text-muted-foreground">No templates available</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {templates.map((template) => (
+                  <div
+                    key={template.id}
+                    className="flex items-center justify-between p-2 hover:bg-secondary rounded-md"
+                  >
+                    <div>
+                      <h3 className="font-medium">{template.name}</h3>
+                      {template.description && (
+                        <p className="text-sm text-muted-foreground">
+                          {template.description}
+                        </p>
+                      )}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleApplyTemplate(template.id)}
+                    >
+                      Apply
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

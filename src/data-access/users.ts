@@ -1,11 +1,13 @@
+// src/data-access/users.ts
+
 import { db } from "@/db";
 import { User, accounts, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import crypto from "crypto";
-import { UserId } from "@/use-cases/types";
-import { getAccountByUserId } from "@/data-access/accounts";
+import { nanoid } from "nanoid";
+import { getAccountByUserId, type UserId } from "@/data-access/accounts";
 
-const ITERATIONS = 10000;
+const ITERATIONS: number = 10000;
 const MAGIC_LINK_TOKEN_TTL = 1000 * 60 * 5; // 5 min
 
 export async function deleteUser(userId: UserId) {
@@ -40,7 +42,10 @@ export async function createUser(email: string) {
   const [user] = await db
     .insert(users)
     .values({
+      id: nanoid(),
       email,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     })
     .returning();
   return user;
@@ -50,16 +55,24 @@ export async function createMagicUser(email: string) {
   const [user] = await db
     .insert(users)
     .values({
+      id: nanoid(),
       email,
       emailVerified: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
     })
     .returning();
 
   await db
     .insert(accounts)
     .values({
+      id: nanoid(),
       userId: user.id,
-      accountType: "email",
+      providerType: "email",
+      provider: "email",
+      providerAccountId: email,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     })
     .returning();
 
@@ -87,7 +100,7 @@ export async function verifyPassword(email: string, plainTextPassword: string) {
   }
 
   const hash = await hashPassword(plainTextPassword, salt);
-  return account.password == hash;
+  return account.password === hash;
 }
 
 export async function getUserByEmail(email: string) {

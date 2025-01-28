@@ -24,15 +24,38 @@ export const users = sqliteTable("user", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
 });
 
+export const profiles = sqliteTable("profile", {
+  id: text("id").primaryKey().default(sql`(hex(randomblob(16)))`),
+  userId: text("user_id").references(() => users.id, { onDelete: "cascade" }).notNull().unique(),
+  displayName: text("display_name").notNull(),
+  image: text("image"),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+}, (table) => ({
+  userIdIndex: index("profile_user_id_idx").on(table.userId),
+}));
+
 export const accounts = sqliteTable("accounts", {
   id: text("id").primaryKey(),
   userId: text("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
-  type: text("type", { enum: ["email", "google", "github"] }).notNull(),
-  provider: text("provider").notNull(),
+  providerType: text("provider_type", { enum: ["oauth", "email", "credentials"] }).notNull(),
+  provider: text("provider", { enum: ["google", "github", "email"] }).notNull(),
   providerAccountId: text("provider_account_id").notNull(),
+  accessToken: text("access_token"),
+  refreshToken: text("refresh_token"),
+  expiresAt: integer("expires_at", { mode: "timestamp" }),
+  tokenType: text("token_type"),
+  scope: text("scope"),
+  idToken: text("id_token"),
+  sessionState: text("session_state"),
   password: text("password"),
   salt: text("salt"),
-});
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+}, (table) => ({
+  providerAccountIdIndex: index("provider_account_id_idx").on(table.providerAccountId),
+  userIdIndex: index("user_id_idx").on(table.userId),
+}));
 
 export const magicLinks = sqliteTable("magic_links", {
   id: text("id").primaryKey(),
@@ -40,6 +63,15 @@ export const magicLinks = sqliteTable("magic_links", {
   token: text("token").notNull(),
   tokenExpiresAt: integer("token_expires_at", { mode: "timestamp" }).notNull(),
   used: sqliteBoolean("used").notNull().default(false),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const verifyEmailTokens = sqliteTable("verify_email_tokens", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  token: text("token").notNull(),
+  tokenExpiresAt: integer("token_expires_at", { mode: "timestamp" }).notNull(),
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
   updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
 });
@@ -215,8 +247,10 @@ export const notifications = sqliteTable("notifications", {
 
 // Type exports
 export type User = typeof users.$inferSelect;
+export type Profile = typeof profiles.$inferSelect;
 export type Account = typeof accounts.$inferSelect;
 export type MagicLink = typeof magicLinks.$inferSelect;
+export type VerifyEmailToken = typeof verifyEmailTokens.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type ChatSession = typeof chatSessions.$inferSelect;
 export type ChatMessage = typeof chatMessages.$inferSelect;

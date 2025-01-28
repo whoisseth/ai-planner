@@ -1,20 +1,22 @@
 import { cookies } from "next/headers";
 import { OAuth2RequestError } from "arctic";
-import { createGithubUserUseCase } from "@/use-cases/users";
-import { getAccountByGithubIdUseCase } from "@/use-cases/accounts";
 import { github } from "@/lib/auth";
+import { db } from "@/db";
+import { accounts, users } from "@/db/schema";
 import { afterLoginUrl } from "@/app-config";
 import { setSession } from "@/lib/session";
+import { eq } from "drizzle-orm";
+import { nanoid } from "nanoid";
+import { env } from "@/env";
 
 export async function GET(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
   const storedState = (await cookies()).get("github_oauth_state")?.value ?? null;
+
   if (!code || !state || !storedState || state !== storedState) {
-    return new Response(null, {
-      status: 400,
-    });
+    return new Response("Invalid OAuth state", { status: 400 });
   }
 
   try {
@@ -24,20 +26,14 @@ export async function GET(request: Request): Promise<Response> {
         Authorization: `Bearer ${tokens.accessToken}`,
       },
     });
-    const githubUser: GitHubUser = await githubUserResponse.json();
 
-    const existingAccount = await getAccountByGithubIdUseCase(githubUser.id);
-
-    if (existingAccount) {
-      await setSession(existingAccount.userId);
-      return new Response(null, {
-        status: 302,
-        headers: {
-          Location: afterLoginUrl,
-        },
-      });
+    if (!githubUserResponse.ok) {
+      throw new Error("Failed to fetch user info from GitHub");
     }
 
+    const githubUser: GitHubUser = await githubUserResponse.json();
+
+    // Get email if not provided
     if (!githubUser.email) {
       const githubUserEmailResponse = await fetch(
         "https://api.github.com/user/emails",
@@ -47,31 +43,73 @@ export async function GET(request: Request): Promise<Response> {
           },
         },
       );
+
+      if (!githubUserEmailResponse.ok) {
+        throw new Error("Failed to fetch GitHub user emails");
+      }
+
       const githubUserEmails = await githubUserEmailResponse.json();
+      const primaryEmail = githubUserEmails.find((email: Email) => email.primary && email.verified);
+      
+      if (!primaryEmail) {
+        return new Response("No verified primary email found", { status: 400 });
+      }
 
-      githubUser.email = getPrimaryEmail(githubUserEmails);
+      githubUser.email = primaryEmail.email;
     }
 
-    const userId = await createGithubUserUseCase(githubUser);
-    await setSession(userId);
-    return new Response(null, {
-      status: 302,
-      headers: {
-        Location: afterLoginUrl,
-      },
+    // Find existing account
+    const existingAccount = await db.query.accounts.findFirst({
+      where: eq(accounts.providerAccountId, githubUser.id),
     });
-  } catch (e) {
-    console.error(e);
-    // the specific error message depends on the provider
-    if (e instanceof OAuth2RequestError) {
-      // invalid code
-      return new Response(null, {
-        status: 400,
+
+    if (existingAccount) {
+      // Update tokens
+      await db.update(accounts)
+        .set({
+          accessToken: tokens.accessToken,
+          updatedAt: new Date(),
+        })
+        .where(eq(accounts.id, existingAccount.id));
+
+      await setSession(existingAccount.userId);
+      return Response.redirect(new URL(afterLoginUrl, env.HOST_NAME));
+    }
+
+    // Create new user and account
+    const userId = nanoid();
+    
+    await db.transaction(async (tx) => {
+      // Create user
+      await tx.insert(users).values({
+        id: userId,
+        email: githubUser.email,
+        emailVerified: new Date(), // GitHub emails are verified
+        createdAt: new Date(),
+        updatedAt: new Date(),
       });
-    }
-    return new Response(null, {
-      status: 500,
+
+      // Create account
+      await tx.insert(accounts).values({
+        id: nanoid(),
+        userId,
+        providerType: "oauth",
+        provider: "github",
+        providerAccountId: githubUser.id,
+        accessToken: tokens.accessToken,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
     });
+
+    await setSession(userId);
+    return Response.redirect(new URL(afterLoginUrl, env.HOST_NAME));
+  } catch (e) {
+    console.error("GitHub OAuth error:", e);
+    if (e instanceof OAuth2RequestError) {
+      return new Response("Invalid authorization code", { status: 400 });
+    }
+    return new Response("Internal server error", { status: 500 });
   }
 }
 
@@ -80,11 +118,6 @@ export interface GitHubUser {
   login: string;
   avatar_url: string;
   email: string;
-}
-
-function getPrimaryEmail(emails: Email[]): string {
-  const primaryEmail = emails.find((email) => email.primary);
-  return primaryEmail!.email;
 }
 
 interface Email {
