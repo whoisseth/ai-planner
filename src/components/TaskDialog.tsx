@@ -40,7 +40,7 @@ interface TaskDialogProps {
 export function TaskDialog({ open, onOpenChange, onCreateTask, onCreateList, lists }: TaskDialogProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [listId, setListId] = useState(lists[0]?.id || "");
+  const [listId, setListId] = useState(lists?.length > 0 ? lists[0].id : "");
   const [isAllDay, setIsAllDay] = useState(false);
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
@@ -79,7 +79,7 @@ export function TaskDialog({ open, onOpenChange, onCreateTask, onCreateList, lis
   const resetForm = () => {
     setTitle("");
     setDescription("");
-    setListId(lists[0]?.id || "");
+    setListId(lists?.length > 0 ? lists[0].id : "");
     setIsAllDay(false);
     setDate("");
     setTime("");
@@ -157,12 +157,12 @@ export function TaskDialog({ open, onOpenChange, onCreateTask, onCreateList, lis
                 </div>
               ) : (
                 <div className="flex gap-2">
-                  <Select value={listId} onValueChange={setListId}>
-                    <SelectTrigger className="w-full ">
-                      <SelectValue placeholder="Choose list" />
+                  <Select value={listId} onValueChange={setListId} required>
+                    <SelectTrigger className="w-full" disabled={!lists?.length}>
+                      <SelectValue placeholder={lists?.length ? "Choose list" : "No lists available"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {lists.map((list) => (
+                      {(lists || []).map((list: { id: string; name: string }) => (
                         <SelectItem key={list.id} value={list.id}>
                           {list.name}
                         </SelectItem>
@@ -230,7 +230,7 @@ export function TaskDialog({ open, onOpenChange, onCreateTask, onCreateList, lis
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
-              className="flex-1 "
+              className="flex-1"
             >
               Cancel
             </Button>
@@ -238,6 +238,7 @@ export function TaskDialog({ open, onOpenChange, onCreateTask, onCreateList, lis
               type="submit" 
               onClick={handleSubmit}
               className="flex-1"
+              disabled={!listId || !title.trim()}
             >
               Create Task
             </Button>

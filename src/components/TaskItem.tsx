@@ -74,11 +74,15 @@ import {
   getTemplates,
   createTemplate,
 } from "@/services/templates";
+import { TagInput, Tag } from "@/components/TagInput";
+import { createTag, getTags, updateTaskTags } from "@/services/tags";
+import { getTaskDependencies, updateTaskDependencies } from "@/services/tasks";
 
 export type Priority = "Low" | "Medium" | "High" | "Urgent";
 
 export interface ExtendedTaskData extends TaskData {
   subtasks: SubTaskData[];
+  tags?: string[];
 }
 
 export interface TaskItemProps {
@@ -88,6 +92,7 @@ export interface TaskItemProps {
   lists?: { id: string; name: string }[];
   onCreateList?: (name: string) => Promise<{ id: string; name: string }>;
   allTasks: ExtendedTaskData[];
+  onTagsChange?: (taskId: string, tagIds: string[]) => void;
 }
 
 export function TaskItem({
@@ -97,6 +102,7 @@ export function TaskItem({
   lists = [],
   onCreateList,
   allTasks,
+  onTagsChange,
 }: TaskItemProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isSubtaskDialogOpen, setIsSubtaskDialogOpen] = useState(false);
@@ -137,10 +143,14 @@ export function TaskItem({
   const [templates, setTemplates] = useState<Template[]>([]);
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
   const [isCreatingTemplate, setIsCreatingTemplate] = useState(false);
+  const [tags, setTags] = useState<Array<{ id: string; name: string; color: string }>>([]);
+  const [isLoadingTags, setIsLoadingTags] = useState(false);
   const titleRef = useRef<HTMLDivElement>(null);
   const descriptionRef = useRef<HTMLDivElement>(null);
   const subtaskTitleRef = useRef<HTMLDivElement>(null);
   const subtaskDescriptionRef = useRef<HTMLDivElement>(null);
+  const [isLoadingDependencies, setIsLoadingDependencies] = useState(false);
+  const [dependencies, setDependencies] = useState<string[]>([]);
 
   const handleStatusChange = () => {
     onUpdate(task.id, {
@@ -198,17 +208,31 @@ export function TaskItem({
           subtaskTitle.trim(),
           description || undefined,
         );
-        onUpdate(task.id, {
+        
+        // Create a new subtask object with all required fields
+        const newSubtask: SubTaskData = {
+          id: subtask.id,
+          taskId: task.id,
+          title: subtaskTitle.trim(),
+          description: description || null,
+          completed: false,
+          dueDate: null,
+          dueTime: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          deletedAt: null,
+          isDeleted: false,
+          sortOrder: (task.subtasks?.length || 0) + 1
+        };
+
+        // Update the parent task with the new subtask
+        const updatedTask: ExtendedTaskData = {
           ...task,
-          subtasks: [
-            ...task.subtasks,
-            {
-              ...subtask,
-              completed: false,
-              description: description || null,
-            },
-          ],
-        });
+          subtasks: [...(task.subtasks || []), newSubtask],
+        };
+        
+        onUpdate(task.id, updatedTask);
+
         setNewSubtask("");
         setNewSubtaskDescription("");
         setQuickAddSubtask("");
@@ -229,22 +253,18 @@ export function TaskItem({
 
   const handleSubtaskStatusChange = async (subtaskId: string) => {
     try {
-      const subtask = task.subtasks.find((st: SubTaskData) => st.id === subtaskId);
+      const subtask = task.subtasks.find((st) => st.id === subtaskId);
       if (subtask) {
-        await updateSubtask(subtaskId, {
+        const updatedSubtask = await updateSubtask(subtaskId, {
           completed: !subtask.completed,
           description: subtask.description,
         });
+
+        // Update the parent task with the updated subtask
         onUpdate(task.id, {
-          description: task.description,
-          title: task.title,
-          priority: task.priority,
-          dueDate: task.dueDate,
-          dueTime: task.dueTime,
-          listId: task.listId,
-          completed: task.completed,
-          subtasks: task.subtasks.map((st: SubTaskData) =>
-            st.id === subtaskId ? { ...st, completed: !st.completed } : st,
+          ...task,
+          subtasks: task.subtasks.map((st) =>
+            st.id === subtaskId ? { ...st, ...updatedSubtask } : st
           ),
         });
       }
@@ -283,9 +303,13 @@ export function TaskItem({
   const handleDeleteSubtask = async (subtaskId: string) => {
     try {
       await deleteSubtask(subtaskId);
+      
+      // Update the parent task by removing the deleted subtask
       onUpdate(task.id, {
+        ...task,
         subtasks: task.subtasks.filter((st) => st.id !== subtaskId),
       });
+
       toast({
         title: "Subtask deleted successfully",
       });
@@ -472,6 +496,52 @@ export function TaskItem({
     }
   };
 
+  const handleCreateTag = async (name: string) => {
+    try {
+      const color = `#${Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')}`;
+      const newTag = await createTag({ name, color });
+      setTags((prev) => [...prev, newTag]);
+      return newTag;
+    } catch (error) {
+      console.error("Failed to create tag:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create tag",
+        variant: "destructive",
+      });
+      throw error;
+    }
+  };
+
+  const handleTagsChange = async (tagIds: string[]) => {
+    try {
+      await updateTaskTags(task.id, tagIds);
+      onTagsChange?.(task.id, tagIds);
+    } catch (error) {
+      console.error("Failed to update task tags:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update task tags",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDependenciesChange = async (dependencyIds: string[]) => {
+    try {
+      await updateTaskDependencies(task.id, dependencyIds);
+      setDependencies(dependencyIds);
+      onUpdate(task.id, { ...task, dependencies: dependencyIds });
+    } catch (error) {
+      console.error("Failed to update dependencies:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update task dependencies",
+        variant: "destructive",
+      });
+    }
+  };
+
   useEffect(() => {
     if (editingTitle && titleRef.current) {
       titleRef.current.focus();
@@ -537,6 +607,48 @@ export function TaskItem({
       loadTemplates();
     }
   }, [isTemplateDialogOpen]);
+
+  useEffect(() => {
+    const loadTags = async () => {
+      setIsLoadingTags(true);
+      try {
+        const tags = await getTags();
+        setTags(tags);
+      } catch (error) {
+        console.error("Failed to load tags:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load tags",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoadingTags(false);
+      }
+    };
+
+    loadTags();
+  }, []);
+
+  useEffect(() => {
+    const loadDependencies = async () => {
+      setIsLoadingDependencies(true);
+      try {
+        const deps = await getTaskDependencies(task.id);
+        setDependencies(deps);
+      } catch (error) {
+        console.error("Failed to load dependencies:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load task dependencies",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoadingDependencies(false);
+      }
+    };
+
+    loadDependencies();
+  }, [task.id]);
 
   return (
     <div className="group relative flex flex-col gap-3 border-b border-border/40 px-2 py-3 transition-colors last:border-b-0 hover:bg-accent/5 sm:px-3">
@@ -1136,6 +1248,67 @@ export function TaskItem({
                   )}
                 </ul>
               </div>
+              <div>
+                <h3 className="text-sm font-medium text-muted-foreground">
+                  Tags
+                </h3>
+                <div className="mt-1">
+                  <TagInput
+                    tags={tags}
+                    selectedTags={task.tags || []}
+                    onTagsChange={handleTagsChange}
+                    onCreateTag={handleCreateTag}
+                  />
+                </div>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-muted-foreground">
+                  Dependencies
+                </h3>
+                <div className="mt-1">
+                  {isLoadingDependencies ? (
+                    <p className="text-sm text-muted-foreground">Loading dependencies...</p>
+                  ) : dependencies.length > 0 ? (
+                    <div className="space-y-2">
+                      {dependencies.map((depId) => {
+                        const depTask = allTasks.find((t) => t.id === depId);
+                        return (
+                          <div
+                            key={depId}
+                            className="flex items-center justify-between rounded-md bg-secondary/50 px-3 py-2"
+                          >
+                            <span className="text-sm">
+                              {depTask?.title || "Unknown Task"}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() =>
+                                handleDependenciesChange(
+                                  dependencies.filter((id) => id !== depId)
+                                )
+                              }
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No dependencies</p>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-2"
+                    onClick={() => setShowDependencies(true)}
+                  >
+                    Manage Dependencies
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
           <DialogFooter className="mt-auto border-t p-4">
@@ -1283,6 +1456,7 @@ export function TaskItem({
         isOpen={showDependencies}
         onClose={() => setShowDependencies(false)}
         allTasks={allTasks}
+        onDependenciesChange={handleDependenciesChange}
       />
 
       <Dialog

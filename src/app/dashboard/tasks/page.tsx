@@ -176,15 +176,19 @@ export default function TasksPage() {
 
         <TabsContent value="active" className="space-y-4">
           <TaskList 
-            tasks={sortTasks(activeTasks)} 
+            tasks={sortTasks(activeTasks)}
+            lists={lists}
             onTasksChange={refreshTasks}
+            showHeader={false}
           />
         </TabsContent>
 
         <TabsContent value="completed" className="space-y-4">
           <TaskList 
             tasks={sortTasks(completedTasks)}
+            lists={lists}
             onTasksChange={refreshTasks}
+            showHeader={false}
           />
         </TabsContent>
       </Tabs>

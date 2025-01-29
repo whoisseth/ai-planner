@@ -3,13 +3,24 @@
 "use server";
 
 import { db } from "@/db";
-import { tasks } from "@/db/schema";
+import { tasks, lists } from "@/db/schema";
 import { getCurrentUser } from "@/app/api/_lib/session";
 import { nanoid } from "nanoid";
-import { eq, inArray, and, desc, asc, SQL } from "drizzle-orm";
+import { eq, inArray, and, desc, asc, max } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { SubTaskData, TaskData } from "@/types/task";
 import { z } from "zod";
+
+// Custom error class for task-related errors
+class TaskError extends Error {
+  constructor(
+    message: string,
+    public code: string,
+  ) {
+    super(message);
+    this.name = "TaskError";
+  }
+}
 
 // Validation schema for task creation
 const createTaskSchema = z.object({
@@ -18,6 +29,7 @@ const createTaskSchema = z.object({
   dueDate: z.date().nullish(),
   dueTime: z.string().nullish(),
   priority: z.enum(["Low", "Medium", "High", "Urgent"]).optional(),
+  listId: z.string().min(1, "List ID is required"),
 });
 
 export async function createTask(
@@ -30,57 +42,97 @@ export async function createTask(
     priority?: "Low" | "Medium" | "High" | "Urgent";
   },
 ): Promise<TaskData> {
-  const user = await getCurrentUser();
-  if (!user) {
-    throw new Error("Not authenticated");
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      throw new TaskError("Not authenticated", "UNAUTHENTICATED");
+    }
+
+    // Validate input data
+    const validatedData = createTaskSchema.parse({ ...data, listId });
+
+    // Verify list exists and belongs to user
+    const list = await db
+      .select()
+      .from(lists)
+      .where(and(eq(lists.id, listId), eq(lists.userId, String(user.id))))
+      .get();
+
+    if (!list) {
+      throw new TaskError("List not found or unauthorized", "LIST_NOT_FOUND");
+    }
+
+    const now = new Date();
+    const taskId = nanoid();
+
+    // Get the maximum sort order for the list
+    const maxSortOrderResult = await db
+      .select({ maxSort: max(tasks.sortOrder) })
+      .from(tasks)
+      .where(and(eq(tasks.listId, listId), eq(tasks.isDeleted, false)))
+      .get();
+
+    // Handle the case where maxSort might be null (no existing tasks)
+    const newSortOrder = maxSortOrderResult?.maxSort
+      ? Number(maxSortOrderResult.maxSort) + 1
+      : 0;
+
+    // Create the task
+    const task = await db
+      .insert(tasks)
+      .values({
+        id: taskId,
+        userId: String(user.id),
+        listId: listId,
+        type: "main" as const,
+        title: validatedData.title,
+        description: validatedData.description || null,
+        dueDate: validatedData.dueDate || null,
+        dueTime: validatedData.dueTime || null,
+        priority: validatedData.priority || "Medium",
+        completed: false,
+        starred: false,
+        sortOrder: newSortOrder,
+        isDeleted: false,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning()
+      .get();
+
+    revalidatePath("/dashboard/lists");
+    revalidatePath("/dashboard/tasks");
+
+    return {
+      id: task.id,
+      userId: task.userId,
+      listId: task.listId,
+      type: task.type,
+      title: task.title,
+      description: task.description || undefined,
+      dueDate: task.dueDate?.toISOString(),
+      dueTime: task.dueTime || undefined,
+      priority: task.priority,
+      completed: task.completed,
+      starred: task.starred,
+      sortOrder: task.sortOrder,
+      isDeleted: task.isDeleted || false,
+      createdAt: task.createdAt!.toISOString(),
+      updatedAt: task.updatedAt!.toISOString(),
+    };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      throw new TaskError(
+        "Invalid task data: " + error.message,
+        "VALIDATION_ERROR",
+      );
+    }
+    if (error instanceof TaskError) {
+      throw error;
+    }
+    console.error("Error creating task:", error);
+    throw new TaskError("Failed to create task", "INTERNAL_ERROR");
   }
-
-  // Validate input data
-  const validatedData = createTaskSchema.parse(data);
-  const now = new Date();
-  const taskId = nanoid();
-
-  const task = await db
-    .insert(tasks)
-    .values({
-      id: taskId,
-      userId: String(user.id),
-      listId: listId,
-      type: "main" as const,
-      title: validatedData.title,
-      description: validatedData.description || null,
-      dueDate: validatedData.dueDate || null,
-      dueTime: validatedData.dueTime || null,
-      priority: validatedData.priority || "Medium",
-      completed: false,
-      starred: false,
-      sortOrder: 0,
-      isDeleted: false,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .returning()
-    .get();
-
-  revalidatePath("/dashboard/lists");
-
-  return {
-    id: task.id,
-    userId: task.userId,
-    listId: task.listId,
-    type: task.type,
-    title: task.title,
-    description: task.description || undefined,
-    dueDate: task.dueDate?.toISOString(),
-    dueTime: task.dueTime || undefined,
-    priority: task.priority,
-    completed: task.completed,
-    starred: task.starred,
-    sortOrder: task.sortOrder,
-    isDeleted: task.isDeleted || false,
-    createdAt: task.createdAt!.toISOString(),
-    updatedAt: task.updatedAt!.toISOString(),
-  };
 }
 
 // Validation schema for task updates
@@ -112,16 +164,31 @@ export async function updateTask(
   // Convert the validated data to match database types
   const updateValues = {
     ...(validatedData.title && { title: validatedData.title }),
-    ...(validatedData.description !== undefined && { description: validatedData.description || null }),
-    ...(validatedData.dueDate && {
-      dueDate: validatedData.dueDate instanceof Date ? validatedData.dueDate : new Date(validatedData.dueDate),
+    ...(validatedData.description !== undefined && {
+      description: validatedData.description || null,
     }),
-    ...(validatedData.dueTime !== undefined && { dueTime: validatedData.dueTime || null }),
+    ...(validatedData.dueDate && {
+      dueDate:
+        validatedData.dueDate instanceof Date
+          ? validatedData.dueDate
+          : new Date(validatedData.dueDate),
+    }),
+    ...(validatedData.dueTime !== undefined && {
+      dueTime: validatedData.dueTime || null,
+    }),
     ...(validatedData.priority && { priority: validatedData.priority }),
-    ...(validatedData.completed !== undefined && { completed: validatedData.completed }),
-    ...(validatedData.starred !== undefined && { starred: validatedData.starred }),
-    ...(validatedData.sortOrder !== undefined && { sortOrder: validatedData.sortOrder }),
-    ...(validatedData.isDeleted !== undefined && { isDeleted: validatedData.isDeleted }),
+    ...(validatedData.completed !== undefined && {
+      completed: validatedData.completed,
+    }),
+    ...(validatedData.starred !== undefined && {
+      starred: validatedData.starred,
+    }),
+    ...(validatedData.sortOrder !== undefined && {
+      sortOrder: validatedData.sortOrder,
+    }),
+    ...(validatedData.isDeleted !== undefined && {
+      isDeleted: validatedData.isDeleted,
+    }),
     updatedAt: now,
   } satisfies Partial<{
     title: string;
@@ -155,6 +222,7 @@ export async function updateTask(
     .all();
 
   revalidatePath("/dashboard/lists");
+  revalidatePath("/dashboard/tasks");
 
   return {
     id: task.id,
@@ -209,6 +277,7 @@ export async function deleteTask(taskId: string): Promise<void> {
     .where(eq(tasks.parentId, taskId));
 
   revalidatePath("/dashboard/lists");
+  revalidatePath("/dashboard/tasks");
 }
 
 export async function getTasks(): Promise<TaskData[]> {
@@ -217,50 +286,64 @@ export async function getTasks(): Promise<TaskData[]> {
     throw new Error("Not authenticated");
   }
 
-  const tasksData = await db
+  // Fetch all tasks (both main and subtasks)
+  const allTasks = await db
     .select()
     .from(tasks)
     .where(
       and(
         eq(tasks.userId, String(user.id)),
-        eq(tasks.type, "main"),
-        eq(tasks.isDeleted, false)
-      )
+        eq(tasks.isDeleted, false),
+      ),
     )
     .orderBy(asc(tasks.sortOrder), desc(tasks.createdAt));
 
-  return Promise.all(
-    tasksData.map(async (task) => {
-      const subtasksData = await db
-        .select()
-        .from(tasks)
-        .where(
-          and(
-            eq(tasks.parentId, task.id),
-            eq(tasks.isDeleted, false)
-          )
-        )
-        .orderBy(asc(tasks.sortOrder), asc(tasks.createdAt));
+  // Separate main tasks and subtasks
+  const mainTasks = allTasks.filter(task => task.type === "main");
+  const subtasksByParentId = allTasks
+    .filter(task => task.type === "sub")
+    .reduce((acc, task) => {
+      if (task.parentId) {
+        if (!acc[task.parentId]) {
+          acc[task.parentId] = [];
+        }
+        acc[task.parentId].push({
+          id: task.id,
+          taskId: task.parentId,
+          title: task.title,
+          description: task.description || null,
+          completed: task.completed,
+          dueDate: task.dueDate,
+          dueTime: task.dueTime || null,
+          createdAt: task.createdAt!,
+          updatedAt: task.updatedAt!,
+          deletedAt: null,
+          isDeleted: task.isDeleted || false,
+          sortOrder: task.sortOrder
+        });
+      }
+      return acc;
+    }, {} as Record<string, any[]>);
 
-      return {
-        id: task.id,
-        userId: task.userId,
-        listId: task.listId,
-        type: task.type,
-        title: task.title,
-        description: task.description || undefined,
-        dueDate: task.dueDate?.toISOString(),
-        dueTime: task.dueTime || undefined,
-        priority: task.priority,
-        completed: task.completed,
-        starred: task.starred,
-        sortOrder: task.sortOrder,
-        isDeleted: task.isDeleted || false,
-        createdAt: task.createdAt!.toISOString(),
-        updatedAt: task.updatedAt!.toISOString(),
-      };
-    }),
-  );
+  // Map main tasks with their subtasks
+  return mainTasks.map(task => ({
+    id: task.id,
+    userId: task.userId,
+    listId: task.listId,
+    type: task.type,
+    title: task.title,
+    description: task.description || undefined,
+    dueDate: task.dueDate?.toISOString(),
+    dueTime: task.dueTime || undefined,
+    priority: task.priority,
+    completed: task.completed,
+    starred: task.starred,
+    sortOrder: task.sortOrder,
+    isDeleted: task.isDeleted || false,
+    createdAt: task.createdAt!.toISOString(),
+    updatedAt: task.updatedAt!.toISOString(),
+    subtasks: subtasksByParentId[task.id] || []
+  }));
 }
 
 export async function getStarredTasks(): Promise<TaskData[]> {
@@ -277,8 +360,8 @@ export async function getStarredTasks(): Promise<TaskData[]> {
         eq(tasks.userId, String(user.id)),
         eq(tasks.starred, true),
         eq(tasks.isDeleted, false),
-        eq(tasks.type, "main")
-      )
+        eq(tasks.type, "main"),
+      ),
     )
     .orderBy(asc(tasks.sortOrder), desc(tasks.createdAt));
 
@@ -287,12 +370,7 @@ export async function getStarredTasks(): Promise<TaskData[]> {
       const subtasksData = await db
         .select()
         .from(tasks)
-        .where(
-          and(
-            eq(tasks.parentId, task.id),
-            eq(tasks.isDeleted, false)
-          )
-        )
+        .where(and(eq(tasks.parentId, task.id), eq(tasks.isDeleted, false)))
         .orderBy(asc(tasks.sortOrder));
 
       return {
@@ -312,7 +390,7 @@ export async function getStarredTasks(): Promise<TaskData[]> {
         createdAt: task.createdAt!.toISOString(),
         updatedAt: task.updatedAt!.toISOString(),
       };
-    })
+    }),
   );
 }
 
@@ -378,7 +456,7 @@ export async function createSubtask(
     updatedAt: subtask.updatedAt || null,
     deletedAt: subtask.deletedAt || null,
     isDeleted: subtask.isDeleted,
-    sortOrder: subtask.sortOrder
+    sortOrder: subtask.sortOrder,
   };
 }
 
@@ -414,7 +492,7 @@ export async function updateSubtask(
     updatedAt: result.updatedAt || null,
     deletedAt: result.deletedAt || null,
     isDeleted: result.isDeleted,
-    sortOrder: result.sortOrder
+    sortOrder: result.sortOrder,
   };
 }
 

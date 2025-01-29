@@ -57,6 +57,7 @@
     "arctic": "1.9.0",
     "class-variance-authority": "0.7.0",
     "clsx": "2.1.1",
+    "cmdk": "^1.0.4",
     "cohere-ai": "^7.15.4",
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",

@@ -1,3 +1,5 @@
+// src/components/TaskDependenciesModal.tsx
+
 import { useState, useEffect } from "react";
 import {
   Dialog,
@@ -8,22 +10,69 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { TaskData } from "@/types/task";
-import { TaskDependency } from "@/db/schema";
-import {
-  addTaskDependency,
-  removeTaskDependency,
-  getTaskDependencies,
-} from "@/services/tasks/dependencies";
-import { useToast } from "@/components/ui/use-toast";
-import { Search, X } from "lucide-react";
+import { toast } from "@/components/ui/use-toast";
+import { ExtendedTaskData } from "@/components/TaskItem";
+import { updateTaskDependencies, getTaskDependencies } from "@/services/tasks";
+import { cn } from "@/lib/utils";
+import { NextResponse } from "next/server";
+import { db } from "@/db";
+import { tasks, taskDependencies } from "@/db/schema";
+import { getCurrentUser } from "@/app/api/_lib/session";
+import { and, eq, sql } from "drizzle-orm";
+import { z } from "zod";
 
 interface TaskDependenciesModalProps {
-  task: TaskData;
+  task: ExtendedTaskData;
   isOpen: boolean;
   onClose: () => void;
-  allTasks: TaskData[];
+  allTasks: ExtendedTaskData[];
+  onDependenciesChange: (dependencyIds: string[]) => void;
+}
+
+// Schema for updating task dependencies
+const updateDependenciesSchema = z.object({
+  dependencyIds: z.array(z.string()),
+});
+
+// Replace the SQL query with a simpler approach
+async function checkDependencyCycle(
+  taskId: string,
+  dependencyId: string
+): Promise<boolean> {
+  const visited = new Set<string>();
+  const stack = new Set<string>();
+
+  async function dfs(currentTaskId: string): Promise<boolean> {
+    if (stack.has(currentTaskId)) {
+      return true; // Found a cycle
+    }
+    if (visited.has(currentTaskId)) {
+      return false; // Already checked this path
+    }
+
+    visited.add(currentTaskId);
+    stack.add(currentTaskId);
+
+    const dependencies = await db
+      .select({
+        prerequisiteTaskId: taskDependencies.prerequisiteTaskId,
+      })
+      .from(taskDependencies)
+      .where(eq(taskDependencies.dependentTaskId, currentTaskId));
+
+    for (const dep of dependencies) {
+      if (await dfs(dep.prerequisiteTaskId)) {
+        return true;
+      }
+    }
+
+    stack.delete(currentTaskId);
+    return false;
+  }
+
+  return dfs(dependencyId);
 }
 
 export function TaskDependenciesModal({
@@ -31,188 +80,120 @@ export function TaskDependenciesModal({
   isOpen,
   onClose,
   allTasks,
+  onDependenciesChange,
 }: TaskDependenciesModalProps) {
-  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
-  const [dependencies, setDependencies] = useState<TaskDependency[]>([]);
-  const [dependents, setDependents] = useState<TaskDependency[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [selectedDependencies, setSelectedDependencies] = useState<string[]>(
+    task.dependencies || []
+  );
+  const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
-    if (isOpen) {
-      loadDependencies();
-    }
-  }, [isOpen, task.id]);
-
-  const loadDependencies = async () => {
-    try {
-      setLoading(true);
-      const data = await getTaskDependencies(task.id);
-      setDependencies(data.dependencies);
-      setDependents(data.dependents);
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to load task dependencies",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+    setSelectedDependencies(task.dependencies || []);
+  }, [task.dependencies]);
 
   const filteredTasks = allTasks.filter(
     (t) =>
       t.id !== task.id &&
-      !dependencies.some((d) => d.prerequisiteTaskId === t.id) &&
-      t.title.toLowerCase().includes(searchQuery.toLowerCase())
+      !t.isDeleted &&
+      (t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t.description?.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  const handleAddDependency = async (prerequisiteTaskId: string) => {
-    try {
-      await addTaskDependency(task.id, prerequisiteTaskId);
-      await loadDependencies();
-      toast({
-        title: "Success",
-        description: "Task dependency added",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: String(error),
-        variant: "destructive",
-      });
-    }
+  const handleToggleDependency = (taskId: string) => {
+    setSelectedDependencies((prev) =>
+      prev.includes(taskId)
+        ? prev.filter((id) => id !== taskId)
+        : [...prev, taskId]
+    );
   };
 
-  const handleRemoveDependency = async (prerequisiteTaskId: string) => {
+  const handleSave = async () => {
     try {
-      await removeTaskDependency(task.id, prerequisiteTaskId);
-      await loadDependencies();
+      setIsUpdating(true);
+      await updateTaskDependencies(task.id, selectedDependencies);
+      onDependenciesChange(selectedDependencies);
       toast({
-        title: "Success",
-        description: "Task dependency removed",
+        title: "Dependencies updated",
+        description: "Task dependencies have been updated successfully.",
       });
+      onClose();
     } catch (error) {
+      console.error("Failed to update dependencies:", error);
       toast({
         title: "Error",
-        description: "Failed to remove task dependency",
+        description: "Failed to update task dependencies",
         variant: "destructive",
       });
+    } finally {
+      setIsUpdating(false);
     }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-h-[90vh] flex flex-col gap-0">
         <DialogHeader>
-          <DialogTitle>Task Dependencies</DialogTitle>
+          <DialogTitle>Manage Dependencies</DialogTitle>
         </DialogHeader>
-
-        <div className="space-y-6">
-          {/* Dependencies Section */}
-          <div>
-            <Label>This task depends on:</Label>
-            <ScrollArea className="h-32 border rounded-md p-2">
-              {dependencies.length === 0 ? (
-                <p className="text-sm text-muted-foreground p-2">
-                  No dependencies added
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {dependencies.map((dep) => {
-                    const prerequisiteTask = allTasks.find(
-                      (t) => t.id === dep.prerequisiteTaskId
-                    );
-                    return (
-                      <div
-                        key={dep.prerequisiteTaskId}
-                        className="flex items-center justify-between p-2 bg-secondary rounded-md"
-                      >
-                        <span className="text-sm">
-                          {prerequisiteTask?.title || "Unknown Task"}
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() =>
-                            handleRemoveDependency(dep.prerequisiteTaskId)
-                          }
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </ScrollArea>
-          </div>
-
-          {/* Dependents Section */}
-          <div>
-            <Label>Tasks that depend on this:</Label>
-            <ScrollArea className="h-32 border rounded-md p-2">
-              {dependents.length === 0 ? (
-                <p className="text-sm text-muted-foreground p-2">
-                  No tasks depend on this
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {dependents.map((dep) => {
-                    const dependentTask = allTasks.find(
-                      (t) => t.id === dep.dependentTaskId
-                    );
-                    return (
-                      <div
-                        key={dep.dependentTaskId}
-                        className="flex items-center justify-between p-2 bg-secondary rounded-md"
-                      >
-                        <span className="text-sm">
-                          {dependentTask?.title || "Unknown Task"}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </ScrollArea>
-          </div>
-
-          {/* Add Dependencies Section */}
-          <div>
-            <Label>Add dependency:</Label>
-            <div className="flex gap-2 mb-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search tasks..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8"
-                />
-              </div>
+        <div className="flex-1 overflow-hidden p-4">
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="search">Search Tasks</Label>
+              <Input
+                id="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by title or description..."
+                className="mt-1.5"
+              />
             </div>
-            <ScrollArea className="h-48 border rounded-md">
-              {filteredTasks.length === 0 ? (
-                <p className="text-sm text-muted-foreground p-4">
-                  No tasks found
-                </p>
-              ) : (
-                <div className="p-2 space-y-2">
-                  {filteredTasks.map((t) => (
-                    <div
-                      key={t.id}
-                      className="flex items-center justify-between p-2 hover:bg-secondary rounded-md cursor-pointer"
-                      onClick={() => handleAddDependency(t.id)}
-                    >
-                      <span className="text-sm">{t.title}</span>
-                    </div>
-                  ))}
+            <div>
+              <Label>Available Tasks</Label>
+              <ScrollArea className="h-[300px] mt-1.5 rounded-md border">
+                <div className="p-4 space-y-2">
+                  {filteredTasks.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      No tasks found
+                    </p>
+                  ) : (
+                    filteredTasks.map((t) => (
+                      <div
+                        key={t.id}
+                        className={cn(
+                          "flex items-start gap-2 p-2 rounded-md transition-colors",
+                          "hover:bg-accent/50 cursor-pointer"
+                        )}
+                        onClick={() => handleToggleDependency(t.id)}
+                      >
+                        <Checkbox
+                          checked={selectedDependencies.includes(t.id)}
+                          onCheckedChange={() => handleToggleDependency(t.id)}
+                          className="mt-1"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm">{t.title}</p>
+                          {t.description && (
+                            <p className="text-xs text-muted-foreground line-clamp-2">
+                              {t.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
-              )}
-            </ScrollArea>
+              </ScrollArea>
+            </div>
           </div>
+        </div>
+        <div className="flex justify-end gap-2 pt-4 border-t">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={isUpdating}>
+            {isUpdating ? "Saving..." : "Save"}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

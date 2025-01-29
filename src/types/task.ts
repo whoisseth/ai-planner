@@ -44,6 +44,7 @@ export interface TaskData {
   createdAt: string;
   updatedAt: string;
   isDeleted?: boolean;
+  subtasks?: SubTaskData[];
 }
 
 export interface ListData {
