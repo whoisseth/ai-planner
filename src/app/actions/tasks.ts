@@ -303,30 +303,30 @@ export async function getTasks(): Promise<TaskData[]> {
   const subtasksByParentId = allTasks
     .filter(task => task.type === "sub")
     .reduce((acc, task) => {
-      if (task.parentId) {
-        if (!acc[task.parentId]) {
-          acc[task.parentId] = [];
-        }
-        acc[task.parentId].push({
-          id: task.id,
-          taskId: task.parentId,
-          title: task.title,
-          description: task.description || null,
-          completed: task.completed,
-          dueDate: task.dueDate,
-          dueTime: task.dueTime || null,
-          createdAt: task.createdAt!,
-          updatedAt: task.updatedAt!,
-          deletedAt: null,
-          isDeleted: task.isDeleted || false,
-          sortOrder: task.sortOrder
-        });
-      }
-      return acc;
-    }, {} as Record<string, any[]>);
-
+        if (task.parentId) {
+            if (!acc[task.parentId]) {
+                acc[task.parentId] = [];
+              }
+              acc[task.parentId].push({
+                  id: task.id,
+                  taskId: task.parentId,
+                  title: task.title,
+                  description: task.description || null,
+                  completed: task.completed,
+                  dueDate: task.dueDate,
+                  dueTime: task.dueTime || null,
+                  createdAt: task.createdAt!,
+                  updatedAt: task.updatedAt!,
+                  deletedAt: null,
+                  isDeleted: task.isDeleted || false,
+                  sortOrder: task.sortOrder
+                });
+              }
+              return acc;
+            }, {} as Record<string, any[]>);
+            
   // Map main tasks with their subtasks
-  return mainTasks.map(task => ({
+  const mappedTasks =  mainTasks.map(task => ({
     id: task.id,
     userId: task.userId,
     listId: task.listId,
@@ -344,6 +344,8 @@ export async function getTasks(): Promise<TaskData[]> {
     updatedAt: task.updatedAt!.toISOString(),
     subtasks: subtasksByParentId[task.id] || []
   }));
+
+  return mappedTasks;
 }
 
 export async function getStarredTasks(): Promise<TaskData[]> {

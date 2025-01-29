@@ -63,6 +63,7 @@ export default async function DashboardPage() {
   try {
     // Fetch data server-side
     const [tasks, lists] = await Promise.all([getTasks(), getLists()]);
+    console.log("tasks: ", tasks);
 
     return (
       <div className="space-y-6">
