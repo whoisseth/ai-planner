@@ -4,7 +4,7 @@
 
 import { db } from "@/db";
 import { tasks } from "@/db/schema";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser } from "@/app/api/_lib/session";
 import { nanoid } from "nanoid";
 import { eq, inArray, and, desc, asc, SQL } from "drizzle-orm";
 import { revalidatePath } from "next/cache";

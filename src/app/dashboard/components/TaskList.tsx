@@ -37,7 +37,7 @@ export function TaskList({
   onCreateList,
   onReorder,
 }: TaskListProps) {
-  const [animationParent] = useAutoAnimate();
+  const [animationParent] = useAutoAnimate<HTMLDivElement>();
 
   const sortedTasks = useMemo(
     () => [...tasks].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)),
@@ -96,53 +96,48 @@ export function TaskList({
     }
   }, [onReorder, onTasksChange, sortedTasks, tasks.length]);
 
-  const combineRefs = useCallback((el: HTMLElement | null, provided: DroppableProvided) => {
-    if (el) {
-      animationParent(el);
-      provided.innerRef(el);
-    }
-  }, [animationParent]);
-
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
       <Droppable droppableId="tasks">
         {(provided: DroppableProvided) => (
           <div
             className="space-y-2"
-            ref={(el) => combineRefs(el, provided)}
             {...provided.droppableProps}
+            ref={animationParent}
           >
-            {sortedTasks.map((task, index) => (
-              <Draggable
-                key={task.id}
-                draggableId={task.id}
-                index={index}
-                isDragDisabled={task.type === "sub"}
-              >
-                {(provided: DraggableProvided) => (
-                  <div
-                    ref={provided.innerRef}
-                    {...provided.draggableProps}
-                    {...provided.dragHandleProps}
-                  >
-                    <TaskItem
-                      task={task}
-                      onUpdate={onUpdate || handleUpdateTask}
-                      onDelete={onDelete || handleDeleteTask}
-                      lists={lists}
-                      onCreateList={onCreateList}
-                      allTasks={tasks}
-                    />
-                  </div>
-                )}
-              </Draggable>
-            ))}
-            {provided.placeholder}
-            {tasks.length === 0 && (
-              <p className="py-4 text-center text-sm text-muted-foreground">
-                No tasks available
-              </p>
-            )}
+            <div ref={provided.innerRef}>
+              {sortedTasks.map((task, index) => (
+                <Draggable
+                  key={task.id}
+                  draggableId={task.id}
+                  index={index}
+                  isDragDisabled={task.type === "sub"}
+                >
+                  {(provided: DraggableProvided) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.draggableProps}
+                      {...provided.dragHandleProps}
+                    >
+                      <TaskItem
+                        task={task}
+                        onUpdate={onUpdate || handleUpdateTask}
+                        onDelete={onDelete || handleDeleteTask}
+                        lists={lists}
+                        onCreateList={onCreateList}
+                        allTasks={tasks}
+                      />
+                    </div>
+                  )}
+                </Draggable>
+              ))}
+              {provided.placeholder}
+              {tasks.length === 0 && (
+                <p className="py-4 text-center text-sm text-muted-foreground">
+                  No tasks available
+                </p>
+              )}
+            </div>
           </div>
         )}
       </Droppable>

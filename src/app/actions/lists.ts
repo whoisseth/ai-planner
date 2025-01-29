@@ -2,7 +2,7 @@
 
 import { db } from "@/db";
 import { lists, tasks } from "@/db/schema";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser } from "@/app/api/_lib/session";
 import { nanoid } from "nanoid";
 import { eq, asc, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -17,6 +17,7 @@ export async function createList(name: string): Promise<ListData> {
     throw new Error("Not authenticated");
   }
 
+  const now = new Date();
   const list = await db
     .insert(lists)
     .values({
@@ -30,14 +31,26 @@ export async function createList(name: string): Promise<ListData> {
       isDeletable: true,
       sortOrder: 0,
       isDeleted: false,
+      createdAt: now,
+      updatedAt: now,
     })
     .returning()
     .get();
 
   revalidatePath("/dashboard");
   return {
-    ...list,
-    userId: String(list.userId)
+    id: list.id,
+    name: list.name,
+    userId: String(list.userId),
+    sortOrder: list.sortOrder,
+    isDefault: list.isDefault,
+    isStarred: list.isStarred,
+    isDone: list.isDone,
+    isEditable: list.isEditable,
+    isDeletable: list.isDeletable,
+    isDeleted: list.isDeleted,
+    createdAt: list.createdAt?.toISOString() ?? now.toISOString(),
+    updatedAt: list.updatedAt?.toISOString() ?? now.toISOString(),
   };
 }
 
@@ -57,10 +70,18 @@ export async function getLists(): Promise<ListData[]> {
     .orderBy(asc(lists.sortOrder));
 
   return listsData.map((list): ListData => ({
-    ...list,
+    id: list.id,
+    name: list.name,
     userId: String(list.userId),
-    createdAt: list.createdAt ? new Date(list.createdAt) : null,
-    updatedAt: list.updatedAt ? new Date(list.updatedAt) : null,
+    sortOrder: list.sortOrder,
+    isDefault: list.isDefault,
+    isStarred: list.isStarred,
+    isDone: list.isDone,
+    isEditable: list.isEditable,
+    isDeletable: list.isDeletable,
+    isDeleted: list.isDeleted,
+    createdAt: list.createdAt?.toISOString() ?? new Date().toISOString(),
+    updatedAt: list.updatedAt?.toISOString() ?? new Date().toISOString(),
   }));
 }
 

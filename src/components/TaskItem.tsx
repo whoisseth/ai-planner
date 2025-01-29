@@ -745,185 +745,191 @@ export function TaskItem({
 
       {isExpanded && (
         <div className="space-y-1 pl-8">
-          {task.subtasks.map((subtask) => (
-            <div
-              key={subtask.id}
-              className="group -mx-2 flex items-start gap-3 rounded-md px-2 py-1.5 transition-colors hover:bg-accent/10"
-            >
-              <div className="flex-shrink-0 pt-0.5">
-                <Checkbox
-                  checked={subtask.completed}
-                  onCheckedChange={() => handleSubtaskStatusChange(subtask.id)}
-                  id={`subtask-${subtask.id}`}
-                  className={cn(
-                    "h-4 w-4 cursor-pointer rounded-full border-2 transition-all duration-200",
-                    subtask.completed
-                      ? "border-primary bg-primary"
-                      : "border-muted-foreground/20",
-                  )}
-                />
-              </div>
-              <div className="min-w-0 flex-1 overflow-hidden">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1 overflow-hidden">
-                    <div
-                      ref={
-                        editingSubtaskInline === subtask.id
-                          ? subtaskTitleRef
-                          : undefined
-                      }
-                      contentEditable={editingSubtaskInline === subtask.id}
-                      onBlur={() => handleSubtaskTitleBlur(subtask.id)}
-                      onClick={handleSubtaskTitleEdit(subtask.id)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          handleSubtaskTitleBlur(subtask.id);
-                        } else if (e.key === "Escape") {
-                          e.preventDefault();
-                          if (subtaskTitleRef.current)
-                            subtaskTitleRef.current.textContent = subtask.title;
-                          setEditingSubtaskInline(null);
-                        }
-                      }}
-                      className={cn(
-                        "min-h-[20px] text-sm leading-5 outline-none focus:outline-none focus-visible:outline-none",
-                        "max-w-full cursor-text whitespace-pre-wrap break-words rounded-sm py-0.5 transition-all duration-75",
-                        editingSubtaskInline === subtask.id
-                          ? "-mx-2 bg-accent/20 px-2 shadow-sm"
-                          : "px-0 hover:-mx-2 hover:bg-accent/10 hover:px-2",
-                        editingSubtaskDescription === subtask.id
-                          ? "-mx-2 bg-accent/20 px-2 shadow-sm"
-                          : "px-0 hover:-mx-2 hover:bg-accent/10 hover:px-2",
-                        subtask.completed &&
-                          "text-muted-foreground/50 line-through",
-                      )}
-                      suppressContentEditableWarning
-                    >
-                      {subtask.title}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {(subtask.dueDate || subtask.dueTime) && (
-                        <span className="flex items-center gap-1 whitespace-nowrap rounded-full bg-muted/50 px-2 py-0.5 text-[10px] text-muted-foreground/80">
-                          <Calendar className="h-2.5 w-2.5" />
-                          <span>
-                            {subtask.dueDate &&
-                              format(subtask.dueDate, "MMM d")}
-                            {subtask.dueTime &&
-                              format(
-                                new Date(`2000/01/01 ${subtask.dueTime}`),
-                                " h:mm a",
-                              )}
-                          </span>
-                        </span>
-                      )}
+          {task.subtasks && task.subtasks.length > 0 ? (
+            task.subtasks.map((subtask) => (
+              <div
+                key={subtask.id}
+                className="group -mx-2 flex items-start gap-3 rounded-md px-2 py-1.5 transition-colors hover:bg-accent/10"
+              >
+                <div className="flex-shrink-0 pt-0.5">
+                  <Checkbox
+                    checked={subtask.completed}
+                    onCheckedChange={() => handleSubtaskStatusChange(subtask.id)}
+                    id={`subtask-${subtask.id}`}
+                    className={cn(
+                      "h-4 w-4 cursor-pointer rounded-full border-2 transition-all duration-200",
+                      subtask.completed
+                        ? "border-primary bg-primary"
+                        : "border-muted-foreground/20",
+                    )}
+                  />
+                </div>
+                <div className="min-w-0 flex-1 overflow-hidden">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1 overflow-hidden">
                       <div
                         ref={
-                          editingSubtaskDescription === subtask.id
-                            ? subtaskDescriptionRef
+                          editingSubtaskInline === subtask.id
+                            ? subtaskTitleRef
                             : undefined
                         }
-                        contentEditable={
-                          editingSubtaskDescription === subtask.id
-                        }
-                        onBlur={() => handleSubtaskDescriptionBlur(subtask.id)}
-                        onClick={() => {
-                          if (!editingSubtaskDescription) {
-                            setEditingSubtaskDescription(subtask.id);
-                            if (subtaskDescriptionRef.current) {
-                              subtaskDescriptionRef.current.textContent =
-                                subtask.description || "";
-                              requestAnimationFrame(() => {
-                                if (subtaskDescriptionRef.current) {
-                                  subtaskDescriptionRef.current.focus();
-                                  const range = document.createRange();
-                                  range.selectNodeContents(
-                                    subtaskDescriptionRef.current,
-                                  );
-                                  const selection = window.getSelection();
-                                  selection?.removeAllRanges();
-                                  selection?.addRange(range);
-                                }
-                              });
-                            }
-                          }
-                        }}
+                        contentEditable={editingSubtaskInline === subtask.id}
+                        onBlur={() => handleSubtaskTitleBlur(subtask.id)}
+                        onClick={handleSubtaskTitleEdit(subtask.id)}
                         onKeyDown={(e) => {
-                          if (e.key === "Enter" && !e.shiftKey) {
+                          if (e.key === "Enter") {
                             e.preventDefault();
-                            handleSubtaskDescriptionBlur(subtask.id);
+                            handleSubtaskTitleBlur(subtask.id);
                           } else if (e.key === "Escape") {
                             e.preventDefault();
-                            if (subtaskDescriptionRef.current) {
-                              subtaskDescriptionRef.current.textContent =
-                                subtask.description || "";
-                            }
-                            setEditingSubtaskDescription(null);
+                            if (subtaskTitleRef.current)
+                              subtaskTitleRef.current.textContent = subtask.title;
+                            setEditingSubtaskInline(null);
                           }
                         }}
                         className={cn(
-                          "min-h-[20px] text-sm outline-none focus:outline-none focus-visible:outline-none",
+                          "min-h-[20px] text-sm leading-5 outline-none focus:outline-none focus-visible:outline-none",
                           "max-w-full cursor-text whitespace-pre-wrap break-words rounded-sm py-0.5 transition-all duration-75",
                           editingSubtaskDescription === subtask.id
                             ? "-mx-2 bg-accent/20 px-2 shadow-sm"
                             : "px-0 hover:-mx-2 hover:bg-accent/10 hover:px-2",
-                          !subtask.description &&
-                            !editingSubtaskDescription &&
-                            "italic text-muted-foreground/50",
-                          subtask.description
-                            ? "text-muted-foreground hover:text-foreground/70"
-                            : "hover:text-muted-foreground/70",
+                          editingSubtaskDescription === subtask.id
+                            ? "-mx-2 bg-accent/20 px-2 shadow-sm"
+                            : "px-0 hover:-mx-2 hover:bg-accent/10 hover:px-2",
+                          subtask.completed &&
+                            "text-muted-foreground/50 line-through",
                         )}
                         suppressContentEditableWarning
                       >
-                        {subtask.description ||
-                          (!editingSubtaskDescription
-                            ? "Add a description..."
-                            : "")}
+                        {subtask.title}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {(subtask.dueDate || subtask.dueTime) && (
+                          <span className="flex items-center gap-1 whitespace-nowrap rounded-full bg-muted/50 px-2 py-0.5 text-[10px] text-muted-foreground/80">
+                            <Calendar className="h-2.5 w-2.5" />
+                            <span>
+                              {subtask.dueDate &&
+                                format(subtask.dueDate, "MMM d")}
+                              {subtask.dueTime &&
+                                format(
+                                  new Date(`2000/01/01 ${subtask.dueTime}`),
+                                  " h:mm a",
+                                )}
+                            </span>
+                          </span>
+                        )}
+                        <div
+                          ref={
+                            editingSubtaskDescription === subtask.id
+                              ? subtaskDescriptionRef
+                              : undefined
+                          }
+                          contentEditable={
+                            editingSubtaskDescription === subtask.id
+                          }
+                          onBlur={() => handleSubtaskDescriptionBlur(subtask.id)}
+                          onClick={() => {
+                            if (!editingSubtaskDescription) {
+                              setEditingSubtaskDescription(subtask.id);
+                              if (subtaskDescriptionRef.current) {
+                                subtaskDescriptionRef.current.textContent =
+                                  subtask.description || "";
+                                requestAnimationFrame(() => {
+                                  if (subtaskDescriptionRef.current) {
+                                    subtaskDescriptionRef.current.focus();
+                                    const range = document.createRange();
+                                    range.selectNodeContents(
+                                      subtaskDescriptionRef.current,
+                                    );
+                                    const selection = window.getSelection();
+                                    selection?.removeAllRanges();
+                                    selection?.addRange(range);
+                                  }
+                                });
+                              }
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              handleSubtaskDescriptionBlur(subtask.id);
+                            } else if (e.key === "Escape") {
+                              e.preventDefault();
+                              if (subtaskDescriptionRef.current) {
+                                subtaskDescriptionRef.current.textContent =
+                                  subtask.description || "";
+                              }
+                              setEditingSubtaskDescription(null);
+                            }
+                          }}
+                          className={cn(
+                            "min-h-[20px] text-sm outline-none focus:outline-none focus-visible:outline-none",
+                            "max-w-full cursor-text whitespace-pre-wrap break-words rounded-sm py-0.5 transition-all duration-75",
+                            editingSubtaskDescription === subtask.id
+                              ? "-mx-2 bg-accent/20 px-2 shadow-sm"
+                              : "px-0 hover:-mx-2 hover:bg-accent/10 hover:px-2",
+                            !subtask.description &&
+                              !editingSubtaskDescription &&
+                              "italic text-muted-foreground/50",
+                            subtask.description
+                              ? "text-muted-foreground hover:text-foreground/70"
+                              : "hover:text-muted-foreground/70",
+                          )}
+                          suppressContentEditableWarning
+                        >
+                          {subtask.description ||
+                            (!editingSubtaskDescription
+                              ? "Add a description..."
+                              : "")}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex flex-shrink-0 items-center gap-1">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 opacity-0 transition-opacity group-hover:opacity-100"
-                        >
-                          <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground/70" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-48">
-                        <DropdownMenuItem
-                          onClick={() => setEditingSubtaskInline(subtask.id)}
-                          className="gap-2"
-                        >
-                          <Edit className="h-4 w-4" /> Edit subtask
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setSelectedSubtaskId(subtask.id);
-                            setIsSubtaskDueDateDialogOpen(true);
-                          }}
-                          className="gap-2"
-                        >
-                          <Calendar className="h-4 w-4" /> Set due date
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => handleDeleteSubtask(subtask.id)}
-                          className="gap-2 text-destructive"
-                        >
-                          <Trash className="h-4 w-4" /> Delete subtask
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <div className="flex flex-shrink-0 items-center gap-1">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 opacity-0 transition-opacity group-hover:opacity-100"
+                          >
+                            <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground/70" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          <DropdownMenuItem
+                            onClick={() => setEditingSubtaskInline(subtask.id)}
+                            className="gap-2"
+                          >
+                            <Edit className="h-4 w-4" /> Edit subtask
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setSelectedSubtaskId(subtask.id);
+                              setIsSubtaskDueDateDialogOpen(true);
+                            }}
+                            className="gap-2"
+                          >
+                            <Calendar className="h-4 w-4" /> Set due date
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => handleDeleteSubtask(subtask.id)}
+                            className="gap-2 text-destructive"
+                          >
+                            <Trash className="h-4 w-4" /> Delete subtask
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))
+          ) : (
+            <li className="text-sm text-muted-foreground">
+              No subtasks
+            </li>
+          )}
           <div className="flex flex-col gap-2 pt-1">
             <div className="relative flex items-center gap-2">
               <div className="group/input relative flex-1">
@@ -1100,7 +1106,7 @@ export function TaskItem({
                   Subtasks
                 </h3>
                 <ul className="mt-1 space-y-2">
-                  {task.subtasks.length > 0 ? (
+                  {task.subtasks && task.subtasks.length > 0 ? (
                     task.subtasks.map((subtask) => (
                       <li key={subtask.id} className="flex items-center gap-2">
                         <Checkbox
@@ -1158,8 +1164,7 @@ export function TaskItem({
                       type="date"
                       id="date"
                       value={
-                        task.subtasks
-                          .find((st) => st.id === selectedSubtaskId)
+                        task.subtasks?.find((st) => st.id === selectedSubtaskId)
                           ?.dueDate?.toISOString()
                           .split("T")[0] || ""
                       }
@@ -1171,7 +1176,7 @@ export function TaskItem({
                           handleUpdateSubtaskDueDate(
                             selectedSubtaskId,
                             date,
-                            task.subtasks.find(
+                            task.subtasks?.find(
                               (st) => st.id === selectedSubtaskId,
                             )?.dueTime || null,
                           );
@@ -1179,7 +1184,7 @@ export function TaskItem({
                       }}
                       className="flex-1"
                     />
-                    {task.subtasks.find((st) => st.id === selectedSubtaskId)
+                    {task.subtasks?.find((st) => st.id === selectedSubtaskId)
                       ?.dueDate && (
                       <Button
                         variant="ghost"
@@ -1190,7 +1195,7 @@ export function TaskItem({
                             handleUpdateSubtaskDueDate(
                               selectedSubtaskId,
                               null,
-                              task.subtasks.find(
+                              task.subtasks?.find(
                                 (st) => st.id === selectedSubtaskId,
                               )?.dueTime || null,
                             );
@@ -1209,14 +1214,14 @@ export function TaskItem({
                       type="time"
                       id="time"
                       value={
-                        task.subtasks.find((st) => st.id === selectedSubtaskId)
+                        task.subtasks?.find((st) => st.id === selectedSubtaskId)
                           ?.dueTime || ""
                       }
                       onChange={(e) => {
                         if (selectedSubtaskId) {
                           handleUpdateSubtaskDueDate(
                             selectedSubtaskId,
-                            task.subtasks.find(
+                            task.subtasks?.find(
                               (st) => st.id === selectedSubtaskId,
                             )?.dueDate || null,
                             e.target.value || null,
@@ -1225,7 +1230,7 @@ export function TaskItem({
                       }}
                       className="flex-1"
                     />
-                    {task.subtasks.find((st) => st.id === selectedSubtaskId)
+                    {task.subtasks?.find((st) => st.id === selectedSubtaskId)
                       ?.dueTime && (
                       <Button
                         variant="ghost"
@@ -1235,7 +1240,7 @@ export function TaskItem({
                           if (selectedSubtaskId) {
                             handleUpdateSubtaskDueDate(
                               selectedSubtaskId,
-                              task.subtasks.find(
+                              task.subtasks?.find(
                                 (st) => st.id === selectedSubtaskId,
                               )?.dueDate || null,
                               null,

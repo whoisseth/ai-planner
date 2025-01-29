@@ -5,8 +5,8 @@ import { getTasks, createTask, updateTask, deleteTask } from "../actions/tasks"
 import { createList, getLists } from "../actions/lists"
 import type { TaskData, ListData } from "@/types/task"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { TaskItem } from "@/components/TaskItem"
-import { ListTodo, CheckCircle2, Star, PlusCircle } from "lucide-react"
+import { TaskItem, ExtendedTaskData } from "@/components/TaskItem"
+import { ListTodo, CheckCircle2, Star, PlusCircle, Calendar, Brain } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { TaskDialog } from "@/components/TaskDialog"
@@ -14,14 +14,14 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Separator } from "@/components/ui/separator"
 
 export default function DashboardPage() {
-  const [tasks, setTasks] = React.useState<TaskData[]>([])
+  const [tasks, setTasks] = React.useState<ExtendedTaskData[]>([])
   const [lists, setLists] = React.useState<ListData[]>([])
   const [isOpen, setIsOpen] = React.useState(false)
 
   React.useEffect(() => {
     const loadData = async () => {
       const [tasksData, listsData] = await Promise.all([getTasks(), getLists()])
-      setTasks(tasksData)
+      setTasks(tasksData as ExtendedTaskData[])
       setLists(listsData)
     }
     loadData()
@@ -44,14 +44,14 @@ export default function DashboardPage() {
         dueTime: taskData.time || null,
         priority: taskData.priority,
       })
-      setTasks((prev) => [...prev, task])
+      setTasks((prev) => [...prev, { ...task, subtasks: [] }])
       setIsOpen(false)
     } catch (error) {
       console.error("Error creating task:", error)
     }
   }
 
-  const handleUpdateTask = async (taskId: string, data: Partial<TaskData>) => {
+  const handleUpdateTask = async (taskId: string, data: Partial<ExtendedTaskData>) => {
     try {
       const { subtasks, ...updateData } = data
       const taskToUpdate = tasks.find((t) => t.id === taskId)
@@ -62,7 +62,13 @@ export default function DashboardPage() {
         listId: updateData.listId || taskToUpdate.listId,
       })
 
-      setTasks((prev) => prev.map((t) => (t.id === updatedTask.id ? updatedTask : t)))
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === updatedTask.id
+            ? { ...updatedTask, subtasks: subtasks || t.subtasks }
+            : t
+        )
+      )
     } catch (error) {
       console.error("Error updating task:", error)
     }
@@ -105,57 +111,128 @@ export default function DashboardPage() {
   )
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky  h-14 top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="flex h-full items-center px-2 md:px-4">
-          <div className="flex flex-1 items-center gap-2">
-            <h1 className="text-lg font-semibold">Dashboard</h1>
-            <div className="flex items-center gap-1 md:gap-2">
-              <TaskStat
-                icon={<ListTodo className="h-4 w-4" />}
-                count={activeTasks.length}
-                label="active"
-                color="text-blue-500"
-              />
-              <TaskStat
-                icon={<CheckCircle2 className="h-4 w-4" />}
-                count={Math.round(completionRate)}
-                label="done"
-                suffix="%"
-                color="text-green-500"
-              />
-              <TaskStat
-                icon={<Star className="h-4 w-4" />}
-                count={starredTasks.length}
-                label="starred"
-                color="text-yellow-500"
-              />
+    <div className="space-y-6">
+      {/* Quick Stats */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Tasks</CardTitle>
+            <ListTodo className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{activeTasks.length}</div>
+            <p className="text-xs text-muted-foreground">
+              {activeTasks.length === 1 ? "task" : "tasks"} pending
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Completion Rate</CardTitle>
+            <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{Math.round(completionRate)}%</div>
+            <p className="text-xs text-muted-foreground">
+              {completedTasks.length} completed tasks
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Starred Tasks</CardTitle>
+            <Star className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{starredTasks.length}</div>
+            <p className="text-xs text-muted-foreground">
+              {starredTasks.length === 1 ? "priority task" : "priority tasks"}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Due Today</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {tasks.filter(t => {
+                const today = new Date();
+                const dueDate = t.dueDate ? new Date(t.dueDate) : null;
+                return dueDate && 
+                  dueDate.getDate() === today.getDate() &&
+                  dueDate.getMonth() === today.getMonth() &&
+                  dueDate.getFullYear() === today.getFullYear();
+              }).length}
             </div>
-          </div>
+            <p className="text-xs text-muted-foreground">tasks due today</p>
+          </CardContent>
+        </Card>
+      </div>
 
-          <div className="flex items-center gap-2">
-            <div className="hidden sm:flex items-center gap-1 border-l pl-2">
-              {Object.entries(priorityBreakdown)
-                .sort(([a], [b]) => {
-                  const order = { Urgent: 0, High: 1, Medium: 2, Low: 3 }
-                  return order[a as keyof typeof order] - order[b as keyof typeof order]
-                })
-                .map(([priority, count]) => (
-                  <PriorityDot
-                    key={priority}
-                    priority={priority as "Urgent" | "High" | "Medium" | "Low"}
-                    count={count}
-                    pendingCount={tasks.filter((t) => t.priority === priority && !t.completed).length}
-                  />
-                ))}
-            </div>
-            <Button onClick={() => setIsOpen(true)} size="icon" variant="outline" className="h-8 w-8">
-              <PlusCircle className="h-4 w-4" />
-              <span className="sr-only">Add Task</span>
-            </Button>
+      {/* Recent Tasks */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <CardTitle>Recent Tasks</CardTitle>
+          <Button onClick={() => setIsOpen(true)} size="sm" variant="outline">
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Add Task
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {tasks
+              .sort((a, b) => {
+                const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                return bTime - aTime;
+              })
+              .slice(0, 5)
+              .map((task) => (
+                <TaskItem
+                  key={task.id}
+                  task={task}
+                  onUpdate={handleUpdateTask}
+                  onDelete={handleDeleteTask}
+                  lists={lists}
+                  onCreateList={handleCreateList}
+                  allTasks={tasks}
+                />
+              ))}
+            {tasks.length === 0 && (
+              <div className="flex items-center justify-center py-8">
+                <p className="text-sm text-muted-foreground">No tasks yet</p>
+              </div>
+            )}
           </div>
-        </div>
-      </header>
+        </CardContent>
+      </Card>
+
+      {/* Priority Distribution */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Priority Distribution</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-4 gap-4">
+            {Object.entries(priorityBreakdown)
+              .sort(([a], [b]) => {
+                const order = { Urgent: 0, High: 1, Medium: 2, Low: 3 };
+                return order[a as keyof typeof order] - order[b as keyof typeof order];
+              })
+              .map(([priority, count]) => (
+                <div key={priority} className="text-center">
+                  <div className="text-2xl font-bold">{count}</div>
+                  <div className="text-xs text-muted-foreground">{priority}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {((count / totalTasks) * 100).toFixed(1)}%
+                  </div>
+                </div>
+              ))}
+          </div>
+        </CardContent>
+      </Card>
 
       <TaskDialog
         open={isOpen}
@@ -164,36 +241,6 @@ export default function DashboardPage() {
         onCreateList={handleCreateList}
         lists={lists}
       />
-
-      <main className="p-2 md:p-4">
-        <Card className="bg-card border-0 shadow-none">
-          <CardHeader className="px-2 pb-2 pt-4 md:p-4">
-            <CardTitle className="text-xl">Recent Tasks</CardTitle>
-          </CardHeader>
-          <CardContent className="px-2 md:px-4">
-            <div className="space-y-3">
-              {tasks
-                .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0))
-                .slice(0, 5)
-                .map((task) => (
-                  <TaskItem
-                    key={task.id}
-                    task={task}
-                    onUpdate={handleUpdateTask}
-                    onDelete={handleDeleteTask}
-                    lists={lists}
-                    onCreateList={handleCreateList}
-                  />
-                ))}
-              {tasks.length === 0 && (
-                <div className="flex items-center justify-center py-8">
-                  <p className="text-sm text-muted-foreground">No tasks yet</p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </main>
     </div>
   )
 }

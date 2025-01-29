@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Suspense, cache } from "react";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser } from "@/app/api/_lib/session";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -15,7 +15,7 @@ import { LayoutDashboard, Lightbulb, Loader2Icon, LogOut } from "lucide-react";
 import { getUserProfileUseCase } from "@/use-cases/users";
 import { ModeToggle } from "./mode-toggle";
 import { MenuButton } from "./menu-button";
-import { UserId } from "@/types";
+import { UserId } from "@/use-cases/types";
 
 const profilerLoader = cache(getUserProfileUseCase);
 
@@ -62,7 +62,7 @@ export async function Header() {
   );
 }
 
-async function ProfileAvatar({ userId }: { userId: number }) {
+async function ProfileAvatar({ userId }: { userId: UserId }) {
   const profile = await profilerLoader(userId);
 
   return (
@@ -103,6 +103,7 @@ async function HeaderActions() {
     </>
   );
 }
+
 async function ProfileDropdown({ userId }: { userId: UserId }) {
   const profile = await profilerLoader(userId);
   return (

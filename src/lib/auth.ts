@@ -13,12 +13,12 @@ import { Session, sessions, User, users } from "@/db/schema";
 import { env } from "@/env";
 import { eq } from "drizzle-orm";
 import { sha256 } from "@oslojs/crypto/sha2";
-import { getSessionToken } from "@/lib/session";
 import type { UserId } from "@/lib/session";
 
 // Constants
 const SESSION_REFRESH_INTERVAL_MS = 1000 * 60 * 60 * 24 * 15; // 15 days
 const SESSION_MAX_DURATION_MS = SESSION_REFRESH_INTERVAL_MS * 2;
+const SESSION_COOKIE_NAME = "session";
 
 // OAuth providers
 export const github = new GitHub(
@@ -65,7 +65,15 @@ export async function createSession(
  * @returns The user and session if valid, null otherwise
  */
 export async function validateSession(request: Request): Promise<{ user: User; session: Session } | null> {
-  const token = await getSessionToken();
+  const cookieHeader = request.headers.get('cookie');
+  if (!cookieHeader) return null;
+
+  const cookies = new Map(
+    cookieHeader.split(';')
+      .map(cookie => cookie.trim().split('=') as [string, string])
+  );
+
+  const token = cookies.get(SESSION_COOKIE_NAME);
   if (!token) return null;
 
   const sessionId = encodeHexLowerCase(sha256(new TextEncoder().encode(token)));

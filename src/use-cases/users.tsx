@@ -39,6 +39,7 @@ import {
 import { db } from "@/db";
 import { createTransaction } from "@/data-access/utils";
 import { render } from "@react-email/render";
+import { createSystemLists } from "@/app/actions/lists";
 
 export async function deleteUserUseCase(
   authenticatedUser: UserSession,
@@ -76,6 +77,7 @@ export async function registerUserUseCase(email: string, password: string) {
   const user = await createUser(email);
   await createAccount(user.id, password);
   await createProfile(user.id, generateRandomName());
+  await createSystemLists(user.id);
 
   const token = await createVerifyEmailToken(user.id);
 
@@ -110,10 +112,10 @@ export async function createGithubUserUseCase(githubUser: GitHubUser) {
 
   if (!existingUser) {
     existingUser = await createUser(githubUser.email);
+    await createSystemLists(existingUser.id);
   }
 
   await createAccountViaGithub(existingUser.id, githubUser.id);
-
   await createProfile(existingUser.id, githubUser.login, githubUser.avatar_url);
 
   return existingUser.id;
@@ -124,10 +126,10 @@ export async function createGoogleUserUseCase(googleUser: GoogleUser) {
 
   if (!existingUser) {
     existingUser = await createUser(googleUser.email);
+    await createSystemLists(existingUser.id);
   }
 
   await createAccountViaGoogle(existingUser.id, googleUser.sub);
-
   await createProfile(existingUser.id, googleUser.name, googleUser.picture);
 
   return existingUser.id;

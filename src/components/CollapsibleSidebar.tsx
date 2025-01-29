@@ -39,7 +39,7 @@ import { createList } from "@/app/actions/lists";
 
 const sidebarItems = [
   {
-    title: "Dashboard",
+    title: "Overview",
     href: "/dashboard",
     icon: LayoutDashboard,
   },
@@ -62,6 +62,16 @@ const sidebarItems = [
     title: "Calendar",
     href: "/dashboard/calendar",
     icon: Calendar,
+  },
+  {
+    title: "Analytics",
+    href: "/dashboard/analytics",
+    icon: Brain,
+  },
+  {
+    title: "Reflection",
+    href: "/dashboard/reflection",
+    icon: Brain,
   },
   {
     title: "Settings",
