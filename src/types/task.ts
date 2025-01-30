@@ -40,7 +40,6 @@ export interface TaskData {
   };
   priority: "Low" | "Medium" | "High" | "Urgent";
   tags?: string[];
-  dependencies?: string[];
   createdAt: string;
   updatedAt: string;
   isDeleted?: boolean;

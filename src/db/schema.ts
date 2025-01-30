@@ -191,18 +191,6 @@ export const taskTags = sqliteTable("task_tags", {
   taskTagUnique: unique("task_tags_unique").on(table.taskId, table.tagId),
 }));
 
-export const taskDependencies = sqliteTable("task_dependencies", {
-  dependentTaskId: text("dependent_task_id").references(() => tasks.id, { onDelete: "cascade" }).notNull(),
-  prerequisiteTaskId: text("prerequisite_task_id").references(() => tasks.id, { onDelete: "cascade" }).notNull(),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
-}, (table) => ({
-  pk: primaryKey({ columns: [table.dependentTaskId, table.prerequisiteTaskId] }),
-  dependencyUnique: unique("task_dependencies_unique").on(table.dependentTaskId, table.prerequisiteTaskId),
-  prerequisiteIndex: index("task_dependencies_prerequisite_idx").on(table.prerequisiteTaskId),
-  // Note: SQLite doesn't support CHECK constraints directly in Drizzle ORM
-  // The self-dependency check will need to be handled in the application logic
-}));
-
 export const templates = sqliteTable("templates", {
   id: text("id").primaryKey(),
   userId: text("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
@@ -258,6 +246,5 @@ export type List = typeof lists.$inferSelect;
 export type Task = typeof tasks.$inferSelect;
 export type Tag = typeof tags.$inferSelect;
 export type TaskTag = typeof taskTags.$inferSelect;
-export type TaskDependency = typeof taskDependencies.$inferSelect;
 export type Template = typeof templates.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;

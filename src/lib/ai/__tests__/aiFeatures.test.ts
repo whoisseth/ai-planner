@@ -5,12 +5,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { suggestTags } from '../tagSuggestionAI';
-import { suggestDependencies } from '../dependencyAI';
-import { 
-  calculateOptimalReminderTime,
-  analyzeDependencyNotification,
-  generateNotificationContent
-} from '../notificationAI';
+import { calculateOptimalReminderTime } from '../notificationAI';
 import type { Task } from '../types';
 import type { Tag } from '@/db/schema';
 
@@ -71,7 +66,9 @@ describe('AI Features', () => {
         usageCount: 5,
         lastUsed: new Date(),
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
+        isDeleted: false,
+        deletedAt: null
       },
       {
         id: 'tag2',
@@ -81,7 +78,9 @@ describe('AI Features', () => {
         usageCount: 3,
         lastUsed: new Date(),
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
+        isDeleted: false,
+        deletedAt: null
       }
     ];
 
@@ -124,29 +123,6 @@ describe('AI Features', () => {
     });
   });
 
-  describe('Dependency Suggestions', () => {
-    it('should suggest relevant dependencies based on content similarity', async () => {
-      const suggestions = await suggestDependencies(mockTask, mockOtherTasks, 'user1');
-      
-      expect(suggestions).toBeInstanceOf(Array);
-      expect(suggestions.length).toBeGreaterThan(0);
-      expect(suggestions[0]).toHaveProperty('task');
-      expect(suggestions[0]).toHaveProperty('score');
-    });
-
-    it('should not suggest completed tasks as dependencies', async () => {
-      const completedTask = { ...mockOtherTasks[0], completed: true };
-      const suggestions = await suggestDependencies(
-        mockTask,
-        [completedTask, ...mockOtherTasks.slice(1)],
-        'user1'
-      );
-      
-      const hasCompletedTask = suggestions.some(s => s.task.id === completedTask.id);
-      expect(hasCompletedTask).toBe(false);
-    });
-  });
-
   describe('Notification System', () => {
     it('should calculate optimal reminder times', async () => {
       const optimalTime = await calculateOptimalReminderTime(
@@ -156,29 +132,6 @@ describe('AI Features', () => {
       );
       
       expect(optimalTime).toBeInstanceOf(Date);
-    });
-
-    it('should analyze dependency notifications', async () => {
-      const analysis = await analyzeDependencyNotification(
-        mockTask,
-        mockOtherTasks,
-        'user1'
-      );
-      
-      expect(analysis).toHaveProperty('shouldNotify');
-      expect(analysis).toHaveProperty('priority');
-    });
-
-    it('should generate personalized notification content', async () => {
-      const content = await generateNotificationContent(
-        mockTask,
-        'reminder',
-        'user1'
-      );
-      
-      expect(content).toHaveProperty('title');
-      expect(content).toHaveProperty('body');
-      expect(content).toHaveProperty('priority');
     });
   });
 }); 

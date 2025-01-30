@@ -1,8 +1,5 @@
 import { Task } from "@/db/schema";
 
-// Re-export all dependencies-related functions
-export * from "./dependencies";
-
 export interface CreateTaskData {
   title: string;
   description?: string;
@@ -41,10 +38,10 @@ export async function createTask(data: CreateTaskData): Promise<Task> {
  * @returns Updated task
  */
 export async function updateTask(
-  id: string,
-  data: Partial<CreateTaskData>
+  taskId: string,
+  data: Partial<Task>
 ): Promise<Task> {
-  const response = await fetch(`/api/tasks/${id}`, {
+  const response = await fetch(`/api/tasks/${taskId}`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
@@ -88,50 +85,4 @@ export async function getTasks(): Promise<Task[]> {
   }
 
   return response.json();
-}
-
-export async function updateTaskDependencies(
-  taskId: string,
-  dependencyIds: string[]
-): Promise<void> {
-  const response = await fetch(`/api/tasks/${taskId}/dependencies`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ dependencyIds }),
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(error);
-  }
-}
-
-export async function getTaskDependencies(taskId: string): Promise<string[]> {
-  const response = await fetch(`/api/tasks/${taskId}/dependencies`);
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(error);
-  }
-
-  return response.json();
-}
-
-export async function checkDependencyCycle(
-  taskId: string,
-  dependencyId: string
-): Promise<boolean> {
-  const response = await fetch(
-    `/api/tasks/${taskId}/dependencies/check-cycle?dependencyId=${dependencyId}`
-  );
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(error);
-  }
-
-  const { hasCycle } = await response.json();
-  return hasCycle;
 } 

@@ -20,7 +20,6 @@ import type { SubTaskData } from "@/types/task";
 import { TaskDialogsProps } from "@/types/TaskItemTypes";
 import { TagInput } from "@/components/TagInput";
 import { TaskEditDialog } from "@/components/TaskEditDialog";
-import { TaskDependenciesModal } from "@/components/TaskDependenciesModal";
 
 export function TaskDialogs({
   task,
@@ -31,7 +30,6 @@ export function TaskDialogs({
   onCreateList,
   allTasks = [],
   onTagsChange,
-  onDependenciesChange,
   onCreateSubtask,
   isLoadingSubtask,
 }: TaskDialogsProps) {
@@ -167,14 +165,6 @@ export function TaskDialogs({
           </div>
         </DialogContent>
       </Dialog>
-
-      <TaskDependenciesModal
-        task={task}
-        isOpen={state.showDependencies}
-        onClose={() => onStateChange({ showDependencies: false })}
-        allTasks={allTasks}
-        onDependenciesChange={onDependenciesChange}
-      />
     </>
   );
 } 

@@ -34,8 +34,6 @@ export interface TaskItemState {
   editingDescription: boolean;
   tempTitle: string;
   tempDescription: string;
-  showDependencies: boolean;
-  dependencies: string[];
   tags: Array<{ id: string; name: string; color: string }>;
   templates: Template[];
   isCreatingTemplate: boolean;
@@ -52,7 +50,6 @@ export interface TaskItemHeaderProps {
   onEdit: () => void;
   onAddSubtask: () => void;
   onViewDetails: () => void;
-  onManageDependencies: () => void;
   onApplyTemplate: () => void;
   onCreateTemplate: () => void;
   onDelete: () => void;
@@ -78,7 +75,6 @@ export interface TaskItemActionsProps {
   onEdit: () => void;
   onDelete: () => void;
   onShowDetails: () => void;
-  onShowDependencies: () => void;
   onShowDatePicker: () => void;
 }
 
@@ -102,7 +98,6 @@ export interface TaskDialogsProps {
   onCreateList?: (name: string) => Promise<{ id: string; name: string }>;
   allTasks: ExtendedTaskData[];
   onTagsChange: (tagIds: string[]) => void;
-  onDependenciesChange: (dependencyIds: string[]) => void;
   onCreateSubtask: (data: { title: string; description?: string | null }) => Promise<void>;
   isLoadingSubtask: boolean;
 }

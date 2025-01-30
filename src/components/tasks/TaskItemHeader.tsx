@@ -8,7 +8,6 @@ import {
   Edit,
   Plus,
   Info,
-  Link2,
   Copy,
   Trash,
   Calendar,
@@ -36,7 +35,6 @@ export function TaskItemHeader({
   onEdit,
   onAddSubtask,
   onViewDetails,
-  onManageDependencies,
   onApplyTemplate,
   onCreateTemplate,
   onDelete,
@@ -193,12 +191,6 @@ export function TaskItemHeader({
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={onViewDetails} className="gap-2">
                   <Info className="h-4 w-4" /> View details
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={onManageDependencies}
-                  className="gap-2"
-                >
-                  <Link2 className="h-4 w-4" /> Manage dependencies
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={onApplyTemplate} className="gap-2">
                   <Copy className="h-4 w-4" /> Apply Template

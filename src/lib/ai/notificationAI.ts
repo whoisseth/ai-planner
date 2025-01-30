@@ -25,8 +25,6 @@ const pineconeClient = new Pinecone({
 
 type NotificationType = 
   | 'reminder'
-  | 'dependency_blocked'
-  | 'dependency_unblocked'
   | 'task_completed'
   | 'due_soon';
 
@@ -154,12 +152,6 @@ async function generateNotificationContent(
   switch (type) {
     case 'reminder':
       baseContent = `Reminder: "${task.title}" needs attention`;
-      break;
-    case 'dependency_blocked':
-      baseContent = `Task "${task.title}" is blocked by incomplete dependencies`;
-      break;
-    case 'dependency_unblocked':
-      baseContent = `Good news! All dependencies for "${task.title}" are now complete`;
       break;
     case 'task_completed':
       baseContent = `Task "${task.title}" has been marked as complete`;
@@ -357,8 +349,6 @@ export async function analyzeNotificationPriority(
     inputs: [content],
     examples: [
       { text: "reminder due_soon urgent task", label: "high" },
-      { text: "dependency_blocked critical path", label: "high" },
-      { text: "task_assigned normal priority", label: "medium" },
       { text: "reminder weekly routine", label: "low" }
     ]
   });
@@ -416,26 +406,6 @@ export async function calculateOptimalReminderTime(
   // - Historical completion patterns
   // - Time of day effectiveness
   return new Date();
-}
-
-/**
- * Determine if a dependency-related notification should be sent
- * @param task The task to check
- * @param dependencyTasks Related dependency tasks
- * @param userId The user's ID
- * @returns Whether to send notification and its priority
- */
-export async function analyzeDependencyNotification(
-  task: Task,
-  dependencyTasks: Task[],
-  userId: string
-): Promise<{ shouldNotify: boolean; priority: 'high' | 'medium' | 'low' }> {
-  // TODO: Implement dependency notification logic based on:
-  // - Task priority
-  // - Chain completion status
-  // - Time until due date
-  // - User's current active hours
-  return { shouldNotify: false, priority: 'low' };
 }
 
 /**

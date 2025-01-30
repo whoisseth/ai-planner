@@ -17,7 +17,6 @@ import { TaskDialogs } from "./tasks/TaskDialogs";
 import { TaskItemProps, TaskItemState } from "@/types/TaskItemTypes";
 import { SubTaskData } from "@/types/task";
 import { getTags } from "@/services/tags";
-import { getTaskDependencies, updateTaskDependencies } from "@/services/tasks";
 import { Droppable } from "@hello-pangea/dnd";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -46,8 +45,6 @@ export function TaskItem({
     editingDescription: false,
     tempTitle: task.title,
     tempDescription: task.description || "",
-    showDependencies: false,
-    dependencies: task.dependencies || [],
     tags: [],
     templates: [],
     isCreatingTemplate: false,
@@ -73,20 +70,6 @@ export function TaskItem({
       });
     }
     setState((prev) => ({ ...prev, editingDescription: false }));
-  };
-
-  const handleDependenciesChange = async (dependencyIds: string[]) => {
-    try {
-      await updateTaskDependencies(task.id, dependencyIds);
-      setState((prev) => ({ ...prev, dependencies: dependencyIds }));
-      toast({ title: "Dependencies updated successfully" });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update dependencies",
-        variant: "destructive",
-      });
-    }
   };
 
   const handleSubtaskCreate = async (data: {
@@ -179,15 +162,6 @@ export function TaskItem({
   };
 
   useEffect(() => {
-    const loadDependencies = async () => {
-      try {
-        const deps = await getTaskDependencies(task.id);
-        setState((prev) => ({ ...prev, dependencies: deps }));
-      } catch (error) {
-        console.error("Failed to load dependencies:", error);
-      }
-    };
-
     const loadTags = async () => {
       try {
         const fetchedTags = await getTags();
@@ -197,7 +171,6 @@ export function TaskItem({
       }
     };
 
-    loadDependencies();
     loadTags();
   }, [task.id]);
 
@@ -239,9 +212,6 @@ export function TaskItem({
                 }
                 onViewDetails={() =>
                   setState((prev) => ({ ...prev, isDetailsDialogOpen: true }))
-                }
-                onManageDependencies={() =>
-                  setState((prev) => ({ ...prev, showDependencies: true }))
                 }
                 onApplyTemplate={() => {
                   /* Implement template application logic */
@@ -330,7 +300,6 @@ export function TaskItem({
             onCreateList={onCreateList}
             allTasks={allTasks}
             onTagsChange={(tagIds: string[]) => onTagsChange?.(task.id, tagIds)}
-            onDependenciesChange={handleDependenciesChange}
             onCreateSubtask={handleSubtaskCreate}
             isLoadingSubtask={state.isLoadingSubtask}
           />
