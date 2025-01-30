@@ -1,13 +1,13 @@
 /**
  * @file taskAI.ts
- * @description AI-powered features for task management, including smart tag suggestions,
- * template recommendations, and task analysis based on user behavior and content.
+ * @description AI-powered features for task management, including smart tag suggestions
+ * and task analysis based on user behavior and content.
  */
 
 import { CohereClient } from "cohere-ai";
 import natural from "natural";
-import type { Task, TemplateSettings } from "./types";
-import type { Tag, Template } from "@/db/schema";
+import type { Task } from "./types";
+import type { Tag } from "@/db/schema";
 
 // Initialize NLP tools
 const tokenizer = new natural.WordTokenizer();
@@ -49,16 +49,6 @@ type TagSuggestion =
   | PatternTagSuggestion;
 
 /**
- * Interface for template suggestion with relevance score
- */
-interface TemplateSuggestion {
-  templateId: string;
-  name: string;
-  relevance: number;
-  matchedCriteria: string[];
-}
-
-/**
  * Interface for task pattern analysis
  */
 interface TaskPattern {
@@ -67,10 +57,6 @@ interface TaskPattern {
   averageDuration: number;
   commonTags: string[];
   commonSubtasks: string[];
-}
-
-interface TemplateWithSettings extends Template {
-  settings: TemplateSettings;
 }
 
 /**
@@ -194,34 +180,6 @@ export async function suggestTags(
 }
 
 /**
- * Suggests templates for a task based on content and tag similarity
- */
-export async function suggestTemplates(
-  task: Task,
-  existingTemplates: Template[],
-  userId: string,
-): Promise<TemplateSuggestion[]> {
-  const suggestions: TemplateSuggestion[] = [];
-
-  for (const template of existingTemplates) {
-    const relevance = calculateTemplateRelevance(
-      task,
-      template as TemplateWithSettings,
-    );
-    if (relevance > 0.3) {
-      suggestions.push({
-        templateId: template.id,
-        name: template.name,
-        relevance,
-        matchedCriteria: ["tag_similarity"],
-      });
-    }
-  }
-
-  return suggestions.sort((a, b) => b.relevance - a.relevance);
-}
-
-/**
  * Analyzes task completion patterns for a user
  */
 export async function analyzeTaskCompletionPatterns(
@@ -260,19 +218,4 @@ export async function suggestTaskSchedule(
 
   // TODO: Implement schedule suggestion algorithm
   return [new Date()];
-}
-
-export function calculateTemplateRelevance(
-  task: Task,
-  template: TemplateWithSettings,
-): number {
-  if (!task.tags) return 0; // Return 0 relevance if no tags exist
-
-  const templateTags = template.settings?.tags || [];
-  const commonTags = task.tags.filter((tag) => templateTags.includes(tag));
-
-  // Calculate relevance score based on tag overlap
-  const tagScore = commonTags.length / Math.max(templateTags.length, 1);
-
-  return tagScore;
 }

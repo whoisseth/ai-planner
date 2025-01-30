@@ -191,31 +191,6 @@ export const taskTags = sqliteTable("task_tags", {
   taskTagUnique: unique("task_tags_unique").on(table.taskId, table.tagId),
 }));
 
-export const templates = sqliteTable("templates", {
-  id: text("id").primaryKey(),
-  userId: text("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
-  name: text("name").notNull(),
-  description: text("description"),
-  settings: text("settings", { mode: "json" }).notNull(), // JSON object for template settings: {
-                                                         //   title?: string,
-                                                         //   description?: string,
-                                                         //   priority?: "Low" | "Medium" | "High" | "Urgent",
-                                                         //   tags?: string[],
-                                                         //   reminder?: ReminderConfig,
-                                                         //   recurrence?: RecurrenceConfig,
-                                                         //   estimatedDuration?: number,
-                                                         //   defaultSubtasks?: {
-                                                         //     title: string,
-                                                         //     description?: string
-                                                         //   }[]
-                                                         // }
-  usageCount: integer("usage_count").notNull().default(0),
-  lastUsed: integer("last_used", { mode: "timestamp" }),
-  isPublic: sqliteBoolean("is_public").notNull().default(false),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
-});
-
 export const notifications = sqliteTable("notifications", {
   id: text("id").primaryKey(),
   userId: text("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
@@ -246,5 +221,4 @@ export type List = typeof lists.$inferSelect;
 export type Task = typeof tasks.$inferSelect;
 export type Tag = typeof tags.$inferSelect;
 export type TaskTag = typeof taskTags.$inferSelect;
-export type Template = typeof templates.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;

@@ -3,177 +3,106 @@
  * @description Tests for AI-powered task management features
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { suggestTags, suggestTemplates } from '../taskAI';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { suggestTags } from '../taskAI';
 import type { Task } from '../types';
-import type { Tag, Template } from '@/db/schema';
-
-// Mock Cohere client
-vi.mock('cohere-ai', () => ({
-  CohereClient: vi.fn().mockImplementation(() => ({
-    embed: vi.fn().mockResolvedValue({
-      embeddings: [[0.1, 0.2, 0.3]]
-    }),
-    classify: vi.fn().mockResolvedValue({
-      classifications: [{
-        prediction: 'high'
-      }]
-    })
-  }))
-}));
+import type { Tag } from '@/db/schema';
 
 describe('taskAI', () => {
-  let mockTask: Task;
+  let mockTask: Required<Task>;
   let mockTags: Tag[];
-  let mockTemplates: Template[];
 
   beforeEach(() => {
     mockTask = {
-      id: '1',
-      title: 'Test task',
-      description: 'Test description',
+      id: 'task1',
+      title: 'Important work task',
+      description: 'Need to complete this by EOD',
       userId: 'user1',
       listId: 'list1',
       type: 'main',
       parentId: null,
       starred: false,
       completed: false,
-      priority: 'Medium' as const,
+      sortOrder: 0,
+      priority: 'High',
       dueDate: null,
       dueTime: null,
       reminder: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      sortOrder: 0,
       isDeleted: false,
       deletedAt: null,
-      tags: [],  // Initialize with empty tags array
-      completedAt: null
-    };
+      completedAt: null,
+      tags: ['tag1', 'tag2'],
+      settings: {},
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as Required<Task>;
 
     mockTags = [
       {
         id: 'tag1',
-        name: 'important',
-        userId: 'user1',
+        name: 'work',
         color: '#ff0000',
+        userId: 'user1',
         usageCount: 5,
-        lastUsed: new Date(),
+        lastUsed: null,
+        isDeleted: false,
+        deletedAt: null,
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       },
       {
         id: 'tag2',
-        name: 'work',
-        userId: 'user1',
+        name: 'important',
         color: '#00ff00',
+        userId: 'user1',
         usageCount: 3,
-        lastUsed: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date()
-      },
-      {
-        id: 'tag3',
-        name: 'personal',
-        userId: 'user1',
-        color: '#0000ff',
-        usageCount: 2,
-        lastUsed: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date()
-      }
-    ];
-
-    mockTemplates = [
-      {
-        id: 'template1',
-        name: 'Work task',
-        description: 'Template for work tasks',
-        userId: 'user1',
-        settings: {
-          tags: ['tag1', 'tag2'],
-          priority: 'High',
-          estimatedDuration: 60
-        },
-        usageCount: 15,
-        lastUsed: new Date(),
+        lastUsed: null,
+        isDeleted: false,
+        deletedAt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
-        isPublic: false
-      }
-    ];
+      },
+    ] as Tag[];
   });
 
   describe('suggestTags', () => {
     it('should suggest tags based on content similarity', async () => {
-      const suggestions = await suggestTags(mockTask as Required<Task>, mockTags, 'user1');
-      
-      expect(suggestions).toBeDefined();
-      expect(Array.isArray(suggestions)).toBe(true);
-      if (suggestions.length > 0) {
-        expect(suggestions[0]).toHaveProperty('confidence');
-        expect(suggestions[0]).toHaveProperty('source');
-        expect(suggestions.some(s => s.source === 'content')).toBe(true);
-      }
+      const suggestions = await suggestTags(mockTask, mockTags, 'user1');
+      expect(suggestions.length).toBeGreaterThan(0);
+      expect(suggestions[0]).toHaveProperty('confidence');
+      expect(suggestions[0]).toHaveProperty('source');
     });
 
-    it('should handle tasks with no tags', async () => {
-      const taskWithoutTags = { ...mockTask, tags: [] };
-      const suggestions = await suggestTags(taskWithoutTags as Required<Task>, mockTags, 'user1');
-      
-      expect(suggestions).toBeDefined();
-      expect(Array.isArray(suggestions)).toBe(true);
+    it('should handle tasks with no matching tags', async () => {
+      const taskWithDifferentContent = {
+        ...mockTask,
+        title: 'Something completely different',
+        description: 'No matching keywords here',
+      };
+      const suggestions = await suggestTags(taskWithDifferentContent, mockTags, 'user1');
+      expect(suggestions.length).toBeLessThan(mockTags.length);
     });
 
     it('should handle empty tag list', async () => {
-      const suggestions = await suggestTags(mockTask as Required<Task>, [], 'user1');
-      
-      expect(suggestions).toHaveLength(0);
-    });
-  });
-
-  describe('suggestTemplates', () => {
-    it('should suggest templates based on content and tags', async () => {
-      const suggestions = await suggestTemplates(mockTask, mockTemplates, 'user1');
-      
-      expect(suggestions).toBeDefined();
-      expect(Array.isArray(suggestions)).toBe(true);
-      if (suggestions.length > 0) {
-        expect(suggestions[0]).toHaveProperty('relevance');
-        expect(suggestions[0]).toHaveProperty('matchedCriteria');
-      }
+      const suggestions = await suggestTags(mockTask, [], 'user1');
+      expect(suggestions).toEqual([]);
     });
 
-    it('should handle tasks with no matching templates', async () => {
-      const taskWithDifferentPriority = {
-        ...mockTask,
-        priority: 'Low' as const
+    it('should consider tag usage frequency', async () => {
+      const frequentlyUsedTag = {
+        ...mockTags[0],
+        usageCount: 100,
       };
-      const suggestions = await suggestTemplates(taskWithDifferentPriority, mockTemplates, 'user1');
-      
-      expect(suggestions.length).toBeLessThan(mockTemplates.length);
-    });
 
-    it('should handle empty template list', async () => {
-      const suggestions = await suggestTemplates(mockTask, [], 'user1');
-      
-      expect(suggestions).toHaveLength(0);
-    });
-
-    it('should consider template usage frequency', async () => {
-      const frequentlyUsedTemplate = {
-        ...mockTemplates[0],
-        usageCount: 20,
-        isPublic: false
-      } as Template;
-      
-      const suggestions = await suggestTemplates(
+      const suggestions = await suggestTags(
         mockTask,
-        [frequentlyUsedTemplate],
-        'user1'
+        [frequentlyUsedTag],
+        'user1',
       );
-      
-      expect(suggestions[0].matchedCriteria).toContain('frequently_used');
+
+      if (suggestions.length > 0) {
+        expect(suggestions[0].tagId).toBe(frequentlyUsedTag.id);
+      }
     });
   });
 }); 

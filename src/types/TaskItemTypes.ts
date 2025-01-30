@@ -1,11 +1,11 @@
 import { TaskData, SubTaskData } from "@/types/task";
-import { Template } from "@/db/schema";
 
 export type Priority = "Low" | "Medium" | "High" | "Urgent";
 
 export interface ExtendedTaskData extends TaskData {
   subtasks: SubTaskData[];
   tags?: string[];
+  status?: "completed" | "in_progress" | "not_started";
 }
 
 export interface TaskItemProps {
@@ -35,8 +35,6 @@ export interface TaskItemState {
   tempTitle: string;
   tempDescription: string;
   tags: Array<{ id: string; name: string; color: string }>;
-  templates: Template[];
-  isCreatingTemplate: boolean;
   isLoadingSubtask: boolean;
 }
 
@@ -45,13 +43,10 @@ export interface TaskItemHeaderProps {
   editingTitle: boolean;
   tempTitle: string;
   isExpanded: boolean;
-  isCreatingTemplate: boolean;
   onStatusChange: () => void;
   onEdit: () => void;
   onAddSubtask: () => void;
   onViewDetails: () => void;
-  onApplyTemplate: () => void;
-  onCreateTemplate: () => void;
   onDelete: () => void;
   onToggleExpand: () => void;
   onTitleEdit: () => void;
@@ -97,9 +92,12 @@ export interface TaskDialogsProps {
   lists?: { id: string; name: string }[];
   onCreateList?: (name: string) => Promise<{ id: string; name: string }>;
   allTasks: ExtendedTaskData[];
-  onTagsChange: (tagIds: string[]) => void;
-  onCreateSubtask: (data: { title: string; description?: string | null }) => Promise<void>;
+  onTagsChange: ((taskId: string, tagIds: string[]) => void) | undefined;
+  onCreateSubtask: (data: {
+    title: string;
+    description?: string | null;
+  }) => Promise<void>;
   isLoadingSubtask: boolean;
 }
 
-export type { SubTaskData }; 
+export type { SubTaskData };

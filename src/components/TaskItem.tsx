@@ -2,7 +2,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/components/ui/use-toast";
 import {
   createSubtask,
@@ -11,14 +10,13 @@ import {
   reorderSubtasks,
 } from "@/app/actions/tasks";
 import { TaskItemHeader } from "./tasks/TaskItemHeader";
-import { TaskItemContent } from "./tasks/TaskItemContent";
 import { SubtaskList } from "./tasks/SubtaskList";
 import { TaskDialogs } from "./tasks/TaskDialogs";
 import { TaskItemProps, TaskItemState } from "@/types/TaskItemTypes";
 import { SubTaskData } from "@/types/task";
 import { getTags } from "@/services/tags";
 import { Droppable } from "@hello-pangea/dnd";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 
 export function TaskItem({
   task,
@@ -46,8 +44,6 @@ export function TaskItem({
     tempTitle: task.title,
     tempDescription: task.description || "",
     tags: [],
-    templates: [],
-    isCreatingTemplate: false,
     isLoadingSubtask: false,
   });
 
@@ -202,7 +198,6 @@ export function TaskItem({
                 editingTitle={state.editingTitle}
                 tempTitle={state.tempTitle}
                 isExpanded={state.isExpanded}
-                isCreatingTemplate={state.isCreatingTemplate}
                 onStatusChange={handleStatusChange}
                 onEdit={() =>
                   setState((prev) => ({ ...prev, isEditDialogOpen: true }))
@@ -212,12 +207,6 @@ export function TaskItem({
                 }
                 onViewDetails={() =>
                   setState((prev) => ({ ...prev, isDetailsDialogOpen: true }))
-                }
-                onApplyTemplate={() => {
-                  /* Implement template application logic */
-                }}
-                onCreateTemplate={() =>
-                  setState((prev) => ({ ...prev, isCreatingTemplate: true }))
                 }
                 onDelete={() => onDelete(task.id)}
                 onToggleExpand={() =>
@@ -244,47 +233,46 @@ export function TaskItem({
                 onDescriptionEdit={(desc: string | null) => {
                   setState((prev) => ({
                     ...prev,
+                    editingDescription: true,
                     tempDescription: desc || "",
                   }));
                 }}
               />
 
               {state.isExpanded && (
-                <>
-                  <SubtaskList
-                    subtasks={task.subtasks}
-                    onStatusChange={async (subtaskId: string) => {
-                      const subtask = task.subtasks.find(
-                        (s) => s.id === subtaskId,
-                      );
-                      if (subtask) {
-                        await handleSubtaskUpdate(subtaskId, {
-                          completed: !subtask.completed,
-                        });
-                      }
-                    }}
-                    onDelete={handleSubtaskDelete}
-                    onReorder={async (subtaskIds: string[]) => {
-                      await reorderSubtasks(task.id, subtaskIds);
-                    }}
-                    onUpdate={handleSubtaskUpdate}
-                    onAdd={async (title: string) => {
-                      await handleSubtaskCreate({ title });
-                    }}
-                    onAddWithDetails={() =>
-                      setState((prev) => ({
-                        ...prev,
-                        isSubtaskDialogOpen: true,
-                      }))
+                <SubtaskList
+                  subtasks={task.subtasks}
+                  onStatusChange={async (subtaskId: string) => {
+                    const subtask = task.subtasks.find(
+                      (s) => s.id === subtaskId,
+                    );
+                    if (subtask) {
+                      await handleSubtaskUpdate(subtaskId, {
+                        completed: !subtask.completed,
+                      });
                     }
-                    onSetDueDate={(subtaskId: string) => {
-                      setState((prev) => ({
-                        ...prev,
-                        isDatePopoverOpen: true,
-                      }));
-                    }}
-                  />
-                </>
+                  }}
+                  onDelete={handleSubtaskDelete}
+                  onReorder={async (subtaskIds: string[]) => {
+                    await reorderSubtasks(task.id, subtaskIds);
+                  }}
+                  onUpdate={handleSubtaskUpdate}
+                  onAdd={async (title: string) => {
+                    await handleSubtaskCreate({ title });
+                  }}
+                  onAddWithDetails={() =>
+                    setState((prev) => ({
+                      ...prev,
+                      isSubtaskDialogOpen: true,
+                    }))
+                  }
+                  onSetDueDate={(subtaskId: string) => {
+                    setState((prev) => ({
+                      ...prev,
+                      isDatePopoverOpen: true,
+                    }));
+                  }}
+                />
               )}
             </div>
           </div>
@@ -299,11 +287,10 @@ export function TaskItem({
             lists={lists}
             onCreateList={onCreateList}
             allTasks={allTasks}
-            onTagsChange={(tagIds: string[]) => onTagsChange?.(task.id, tagIds)}
+            onTagsChange={onTagsChange}
             onCreateSubtask={handleSubtaskCreate}
             isLoadingSubtask={state.isLoadingSubtask}
           />
-
           {provided.placeholder}
         </motion.div>
       )}
