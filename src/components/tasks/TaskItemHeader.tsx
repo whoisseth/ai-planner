@@ -24,27 +24,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import type { ExtendedTaskData } from "@/components/TaskItem";
-
-interface TaskItemHeaderProps {
-  task: ExtendedTaskData;
-  isExpanded: boolean;
-  isCreatingTemplate: boolean;
-  onStatusChange: () => void;
-  onEdit: () => void;
-  onAddSubtask: () => void;
-  onViewDetails: () => void;
-  onManageDependencies: () => void;
-  onApplyTemplate: () => void;
-  onCreateTemplate: () => void;
-  onDelete: () => void;
-  onToggleExpand: () => void;
-  onTitleEdit: (newTitle: string) => void;
-  onDescriptionEdit: (newDescription: string | null) => void;
-}
+import type { TaskItemHeaderProps } from "@/types/TaskItemTypes";
 
 export function TaskItemHeader({
   task,
+  editingTitle,
+  tempTitle,
   isExpanded,
   isCreatingTemplate,
   onStatusChange,
@@ -57,16 +42,16 @@ export function TaskItemHeader({
   onDelete,
   onToggleExpand,
   onTitleEdit,
+  onTitleChange,
+  onTitleBlur,
   onDescriptionEdit,
 }: TaskItemHeaderProps) {
   const titleRef = useRef<HTMLDivElement>(null);
   const descriptionRef = useRef<HTMLDivElement>(null);
 
-  const handleTitleBlur = () => {
-    const newTitle = titleRef.current?.textContent?.trim();
-    if (newTitle && newTitle !== task.title) {
-      onTitleEdit(newTitle);
-    }
+  const handleTitleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    onTitleEdit();
   };
 
   const handleDescriptionBlur = () => {
@@ -123,25 +108,34 @@ export function TaskItemHeader({
                 </span>
               )}
             </div>
-            <div
-              ref={titleRef}
-              contentEditable
-              onBlur={handleTitleBlur}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  handleTitleBlur();
-                }
-              }}
-              className={cn(
-                "min-h-[24px] text-sm font-medium leading-6 outline-none focus:outline-none focus-visible:outline-none",
-                "max-w-full cursor-text whitespace-pre-wrap break-words rounded-sm py-0.5 transition-all duration-200",
-                "px-0 hover:-mx-2 hover:bg-accent/10 hover:px-2",
-                task.completed && "text-muted-foreground/50 line-through",
-              )}
-              suppressContentEditableWarning
-            >
-              {task.title}
+            <div className="flex items-center gap-2">
+              <div className="flex flex-1 items-center gap-2">
+                {editingTitle ? (
+                  <input
+                    type="text"
+                    value={tempTitle}
+                    onChange={(e) => onTitleChange(e.target.value)}
+                    onBlur={onTitleBlur}
+                    className={cn(
+                      "w-full bg-transparent text-base font-medium leading-none",
+                      "focus:outline-none focus-visible:outline-none",
+                      task.completed && "text-muted-foreground/50 line-through",
+                    )}
+                    autoFocus
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleTitleClick}
+                    className={cn(
+                      "w-full cursor-text text-left text-base font-medium leading-none",
+                      task.completed && "text-muted-foreground/50 line-through",
+                    )}
+                  >
+                    {task.title}
+                  </button>
+                )}
+              </div>
             </div>
             <div
               ref={descriptionRef}
@@ -168,6 +162,18 @@ export function TaskItemHeader({
             </div>
           </div>
           <div className="flex flex-shrink-0 items-center gap-1.5">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 transition-opacity"
+              onClick={onToggleExpand}
+            >
+              {isExpanded ? (
+                <ChevronUp className="h-4 w-4" />
+              ) : (
+                <ChevronDown className="h-4 w-4" />
+              )}
+            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -188,7 +194,10 @@ export function TaskItemHeader({
                 <DropdownMenuItem onClick={onViewDetails} className="gap-2">
                   <Info className="h-4 w-4" /> View details
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={onManageDependencies} className="gap-2">
+                <DropdownMenuItem
+                  onClick={onManageDependencies}
+                  className="gap-2"
+                >
                   <Link2 className="h-4 w-4" /> Manage dependencies
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={onApplyTemplate} className="gap-2">
@@ -200,29 +209,22 @@ export function TaskItemHeader({
                   className="gap-2"
                 >
                   <Copy className="h-4 w-4" />
-                  {isCreatingTemplate ? "Creating Template..." : "Save as Template"}
+                  {isCreatingTemplate
+                    ? "Creating Template..."
+                    : "Save as Template"}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onDelete} className="gap-2 text-destructive">
+                <DropdownMenuItem
+                  onClick={onDelete}
+                  className="gap-2 text-destructive"
+                >
                   <Trash className="h-4 w-4" /> Delete task
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 transition-opacity"
-              onClick={onToggleExpand}
-            >
-              {isExpanded ? (
-                <ChevronUp className="h-3.5 w-3.5 text-muted-foreground/70" />
-              ) : (
-                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground/70" />
-              )}
-            </Button>
           </div>
         </div>
       </div>
     </div>
   );
-} 
+}

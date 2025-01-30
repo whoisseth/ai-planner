@@ -14,6 +14,8 @@ import {
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import type { SubTaskData } from "@/types/task";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 interface SubtaskItemProps {
   subtask: SubTaskData;
@@ -21,6 +23,7 @@ interface SubtaskItemProps {
   onUpdate: (subtaskId: string, data: Partial<SubTaskData>) => void;
   onDelete: (subtaskId: string) => void;
   onSetDueDate: (subtaskId: string) => void;
+  isDragging?: boolean;
 }
 
 export function SubtaskItem({
@@ -29,11 +32,29 @@ export function SubtaskItem({
   onUpdate,
   onDelete,
   onSetDueDate,
+  isDragging,
 }: SubtaskItemProps) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [editingDescription, setEditingDescription] = useState(false);
   const titleRef = useRef<HTMLDivElement>(null);
   const descriptionRef = useRef<HTMLDivElement>(null);
+
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging: isSortableDragging,
+  } = useSortable({
+    id: subtask.id,
+    data: subtask,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
 
   const handleTitleBlur = () => {
     const newTitle = titleRef.current?.textContent?.trim();
@@ -56,8 +77,20 @@ export function SubtaskItem({
   };
 
   return (
-    <div className="group -mx-2 flex items-start gap-3 rounded-md px-2 py-1.5 transition-colors hover:bg-accent/10">
-      <div className="flex-shrink-0 pt-0.5">
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      className={cn(
+        "group -mx-2 flex items-start gap-3 rounded-md px-2 py-1.5 transition-colors hover:bg-accent/10",
+        (isDragging || isSortableDragging) && "opacity-50",
+        "touch-none",
+      )}
+    >
+      <div
+        className="flex-shrink-0 cursor-grab pt-0.5 active:cursor-grabbing"
+        {...listeners}
+      >
         <Checkbox
           checked={subtask.completed}
           onCheckedChange={() => onStatusChange(subtask.id)}
@@ -84,7 +117,8 @@ export function SubtaskItem({
                   handleTitleBlur();
                 } else if (e.key === "Escape") {
                   e.preventDefault();
-                  if (titleRef.current) titleRef.current.textContent = subtask.title;
+                  if (titleRef.current)
+                    titleRef.current.textContent = subtask.title;
                   setEditingTitle(false);
                 }
               }}
@@ -107,7 +141,10 @@ export function SubtaskItem({
                   <span>
                     {subtask.dueDate && format(subtask.dueDate, "MMM d")}
                     {subtask.dueTime &&
-                      format(new Date(`2000/01/01 ${subtask.dueTime}`), " h:mm a")}
+                      format(
+                        new Date(`2000/01/01 ${subtask.dueTime}`),
+                        " h:mm a",
+                      )}
                   </span>
                 </span>
               )}
@@ -115,7 +152,9 @@ export function SubtaskItem({
                 ref={descriptionRef}
                 contentEditable={editingDescription}
                 onBlur={handleDescriptionBlur}
-                onClick={() => !editingDescription && setEditingDescription(true)}
+                onClick={() =>
+                  !editingDescription && setEditingDescription(true)
+                }
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
@@ -123,7 +162,8 @@ export function SubtaskItem({
                   } else if (e.key === "Escape") {
                     e.preventDefault();
                     if (descriptionRef.current) {
-                      descriptionRef.current.textContent = subtask.description || "";
+                      descriptionRef.current.textContent =
+                        subtask.description || "";
                     }
                     setEditingDescription(false);
                   }
@@ -140,10 +180,12 @@ export function SubtaskItem({
                   subtask.description
                     ? "text-muted-foreground hover:text-foreground/70"
                     : "hover:text-muted-foreground/70",
+                  "w-full",
                 )}
                 suppressContentEditableWarning
               >
-                {subtask.description || (!editingDescription ? "Add a description..." : "")}
+                {subtask.description ||
+                  (!editingDescription ? "Add a description..." : "")}
               </div>
             </div>
           </div>
@@ -185,4 +227,4 @@ export function SubtaskItem({
       </div>
     </div>
   );
-} 
+}

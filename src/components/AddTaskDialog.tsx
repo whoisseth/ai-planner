@@ -20,9 +20,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Priority } from "./TaskItem";
-import { TaskData } from "@/types/task";
+import type { TaskData } from "@/types/task";
 import { toast } from "sonner";
+
+type Priority = "Low" | "Medium" | "High" | "Urgent";
 
 interface AddTaskDialogProps {
   open?: boolean;
@@ -31,9 +32,8 @@ interface AddTaskDialogProps {
     title: string;
     description?: string;
     listId: string;
-    isAllDay?: boolean;
-    date?: string;
-    time?: string;
+    dueDate?: Date | null;
+    dueTime?: string | null;
     priority?: Priority;
   }) => void;
   onCreateList: (name: string) => Promise<{ id: string; name: string }>;
@@ -54,7 +54,6 @@ export function AddTaskDialog({
     priority: "Medium" as Priority,
     date: "",
     time: "",
-    isAllDay: false
   });
 
   const handleAddTask = () => {
@@ -64,9 +63,8 @@ export function AddTaskDialog({
         description: newTask.description.trim() || undefined,
         listId: newTask.listId,
         priority: newTask.priority,
-        date: newTask.date || undefined,
-        time: newTask.time || undefined,
-        isAllDay: newTask.isAllDay
+        dueDate: newTask.date ? new Date(newTask.date) : null,
+        dueTime: newTask.time || null,
       });
       
       // Reset form
@@ -77,7 +75,6 @@ export function AddTaskDialog({
         priority: "Medium",
         date: "",
         time: "",
-        isAllDay: false
       });
       
       toast.success("Task added successfully");
@@ -126,6 +123,7 @@ export function AddTaskDialog({
               <Input
                 id="date"
                 type="date"
+                value={newTask.date}
                 onChange={(e) =>
                   setNewTask({ ...newTask, date: e.target.value })
                 }
@@ -136,12 +134,34 @@ export function AddTaskDialog({
               <Input
                 id="time"
                 type="time"
+                value={newTask.time}
                 onChange={(e) =>
                   setNewTask({ ...newTask, time: e.target.value })
                 }
                 className="h-12"
               />
             </div>
+            {lists.length > 0 && (
+              <div className="grid gap-2">
+                <Select
+                  value={newTask.listId}
+                  onValueChange={(value: string) =>
+                    setNewTask({ ...newTask, listId: value })
+                  }
+                >
+                  <SelectTrigger className="h-12">
+                    <SelectValue placeholder="Select List" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {lists.map((list) => (
+                      <SelectItem key={list.id} value={list.id}>
+                        {list.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
         </div>
         <DialogFooter className="p-4 border-t mt-auto">
@@ -156,6 +176,7 @@ export function AddTaskDialog({
             <Button 
               onClick={handleAddTask}
               className="flex-1 h-12"
+              disabled={!newTask.title.trim() || !newTask.listId}
             >
               Add task
             </Button>

@@ -1,12 +1,17 @@
 "use client";
-import React from "react";
+import React, { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PlusCircle } from "lucide-react";
-import { TaskItem, ExtendedTaskData } from "@/components/TaskItem";
+import { TaskItem } from "@/components/TaskItem";
 import { TaskDialog } from "@/components/TaskDialog";
 import type { TaskData, ListData, SubTaskData } from "@/types/task";
-import { createTask, updateTask, deleteTask } from "@/app/actions/tasks";
+import {
+  createTask,
+  updateTask,
+  deleteTask,
+  updateSubtask,
+} from "@/app/actions/tasks";
 import { createList } from "@/app/actions/lists";
 import {
   DragDropContext,
@@ -14,6 +19,9 @@ import {
   Draggable,
   DropResult,
 } from "@hello-pangea/dnd";
+import { AnimatePresence, motion } from "framer-motion";
+import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface TaskListProps {
   initialTasks?: TaskData[];
@@ -22,6 +30,15 @@ interface TaskListProps {
   lists?: ListData[];
   onTasksChange?: () => Promise<void>;
   showHeader?: boolean;
+}
+
+interface TaskWithSubtasks extends TaskData {
+  subtasks: SubTaskData[];
+}
+
+interface ExtendedTaskData extends TaskWithSubtasks {
+  dependencies?: string[];
+  tags?: string[];
 }
 
 export function TaskList({
@@ -86,6 +103,17 @@ export function TaskList({
 
   const lists = propLists || localLists;
 
+  const [draggedItem, setDraggedItem] = useState<{
+    type: "task" | "subtask";
+    sourceId: string;
+    itemId: string;
+  } | null>(null);
+
+  const [dropTarget, setDropTarget] = useState<{
+    id: string;
+    type: "task" | "subtask-list";
+  } | null>(null);
+
   const handleCreateTask = async (taskData: {
     title: string;
     description?: string;
@@ -96,21 +124,37 @@ export function TaskList({
     priority?: "Low" | "Medium" | "High" | "Urgent";
   }) => {
     try {
-      const task = await createTask(taskData.listId, {
-        title: taskData.title,
-        description: taskData.description,
-        dueDate: taskData.date ? new Date(taskData.date) : null,
-        dueTime: taskData.time || null,
-        priority: taskData.priority,
+      // Create the task using the services/tasks API
+      const task = await fetch("/api/tasks", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: taskData.title,
+          description: taskData.description,
+          listId: taskData.listId,
+          priority: taskData.priority || "Medium",
+          dueDate: taskData.date,
+          dueTime: taskData.isAllDay ? null : taskData.time,
+        }),
+      }).then((res) => {
+        if (!res.ok) {
+          throw new Error("Failed to create task");
+        }
+        return res.json();
       });
+
       if (propTasks) {
         onTasksChange?.();
       } else {
         setLocalTasks((prev) => [...prev, { ...task, subtasks: [] }]);
       }
       setIsOpen(false);
+      toast.success("Task created successfully");
     } catch (error) {
       console.error("Error creating task:", error);
+      toast.error("Failed to create task");
     }
   };
 
@@ -166,24 +210,130 @@ export function TaskList({
     }
   };
 
+  const handleDragStart = (result: any) => {
+    const { type, draggableId, source } = result;
+    setDraggedItem({
+      type: type === "task" ? "task" : "subtask",
+      sourceId: source.droppableId,
+      itemId: draggableId,
+    });
+  };
+
   const handleDragEnd = async (result: DropResult) => {
-    if (!result.destination) return;
-    const items = Array.from(tasks);
-    const [reorderedItem] = items.splice(result.source.index, 1);
-    items.splice(result.destination.index, 0, reorderedItem);
-    const updatedItems = items.map((task, index) => ({
-      ...task,
-      sortOrder: (index + 1) * 1000,
-      subtasks: task.subtasks || [],
-    }));
-    if (propTasks) {
-      await handleUpdateTask(reorderedItem.id, {
-        sortOrder: (result.destination.index + 1) * 1000,
-      });
-      onTasksChange?.();
-    } else {
-      setLocalTasks(updatedItems);
+    const { source, destination, type, draggableId } = result;
+
+    setDraggedItem(null);
+    setDropTarget(null);
+
+    if (!destination) return;
+
+    // If dropped in the same position
+    if (
+      destination.droppableId === source.droppableId &&
+      destination.index === source.index
+    ) {
+      return;
     }
+
+    try {
+      // Handle task reordering
+      if (type === "task") {
+        const items = Array.from(tasks);
+        const [reorderedItem] = items.splice(source.index, 1);
+        items.splice(destination.index, 0, reorderedItem);
+
+        const updatedItems = items.map((task, index) => ({
+          ...task,
+          sortOrder: (index + 1) * 1000,
+        }));
+
+        // Update all affected tasks' sort orders
+        for (const task of updatedItems) {
+          await handleUpdateTask(task.id, {
+            sortOrder: task.sortOrder,
+          });
+        }
+
+        if (propTasks) {
+          onTasksChange?.();
+        } else {
+          setLocalTasks(updatedItems as TaskWithSubtasks[]);
+        }
+      }
+
+      // Handle subtask reordering
+      if (type === "subtask") {
+        const sourceTask = tasks.find((t) => t.id === source.droppableId);
+        const destinationTask = tasks.find(
+          (t) => t.id === destination.droppableId,
+        );
+
+        if (!sourceTask || !destinationTask) return;
+
+        const subtasks = Array.from(sourceTask.subtasks || []);
+        const [movedSubtask] = subtasks.splice(source.index, 1);
+
+        if (source.droppableId === destination.droppableId) {
+          // Reordering within the same task
+          subtasks.splice(destination.index, 0, movedSubtask);
+          const updatedSubtasks = subtasks.map((subtask, index) => ({
+            ...subtask,
+            sortOrder: (index + 1) * 1000,
+          }));
+
+          // Update all affected subtasks' sort orders
+          for (const subtask of updatedSubtasks) {
+            await updateSubtask(subtask.id, {
+              sortOrder: subtask.sortOrder,
+            });
+          }
+        } else {
+          // Moving subtask to a different task
+          const destSubtasks = Array.from(destinationTask.subtasks || []);
+          destSubtasks.splice(destination.index, 0, movedSubtask);
+
+          // Update the moved subtask with new parent and sort order
+          await updateSubtask(movedSubtask.id, {
+            taskId: destinationTask.id,
+            sortOrder: (destination.index + 1) * 1000,
+          });
+
+          // Update sort orders of other subtasks in destination task
+          const updatedDestSubtasks = destSubtasks.map((subtask, index) => ({
+            ...subtask,
+            sortOrder: (index + 1) * 1000,
+          }));
+
+          for (const subtask of updatedDestSubtasks) {
+            if (subtask.id !== movedSubtask.id) {
+              await updateSubtask(subtask.id, {
+                sortOrder: subtask.sortOrder,
+              });
+            }
+          }
+        }
+
+        if (propTasks) {
+          onTasksChange?.();
+        }
+      }
+    } catch (error) {
+      console.error("Error during drag and drop:", error);
+      toast.error("Failed to update task order. Please try again.");
+    }
+  };
+
+  const handleDragUpdate = (result: any) => {
+    if (!result.destination) {
+      setDropTarget(null);
+      return;
+    }
+
+    setDropTarget({
+      id: result.destination.droppableId,
+      type:
+        result.destination.droppableId === "tasks" ? "task" : "subtask-list",
+    });
   };
 
   console.log("before sorted tasks- ", tasks);
@@ -202,23 +352,35 @@ export function TaskList({
   console.log("sortedTasks- ", sortedTasks);
 
   const taskItems = (
-    <DragDropContext onDragEnd={handleDragEnd}>
-      <Droppable droppableId="tasks">
-        {(provided) => (
+    <DragDropContext
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragUpdate={handleDragUpdate}
+    >
+      <Droppable droppableId="tasks" type="task">
+        {(provided, snapshot) => (
           <div
             {...provided.droppableProps}
             ref={provided.innerRef}
-            className="space-y-3"
+            className={cn(
+              "space-y-3",
+              snapshot.isDraggingOver && "rounded-lg bg-accent/5 p-2",
+            )}
           >
             {sortedTasks
               .slice(0, showHeader ? 5 : undefined)
               .map((task, index) => (
                 <Draggable key={task.id} draggableId={task.id} index={index}>
-                  {(provided) => (
+                  {(provided, snapshot) => (
                     <div
                       ref={provided.innerRef}
                       {...provided.draggableProps}
                       {...provided.dragHandleProps}
+                      className={cn(
+                        snapshot.isDragging && "scale-105 opacity-50 shadow-lg",
+                        dropTarget?.id === task.id &&
+                          "ring-2 ring-primary ring-offset-2",
+                      )}
                     >
                       <TaskItem
                         task={task}
@@ -227,6 +389,8 @@ export function TaskList({
                         lists={lists}
                         onCreateList={handleCreateList}
                         allTasks={sortedTasks}
+                        isDragging={snapshot.isDragging}
+                        isDropTarget={dropTarget?.id === task.id}
                       />
                     </div>
                   )}
