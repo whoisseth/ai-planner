@@ -3,11 +3,9 @@ import { Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/toaster";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
-import { AIChatbox } from "@/components/AIChatbox";
 import { getCurrentUser } from "@/lib/session";
 import { redirect } from "next/navigation";
-
-const inter = Inter({ subsets: ["latin"] });
+import { AIChatbox } from "@/components/chat/AIChatbox";
 
 export const metadata: Metadata = {
   title: "AI-Powered Daily Planner",
@@ -32,6 +30,7 @@ export default async function RootLayout({
         </div>
       </div>
       <AIChatbox />
+
       <Toaster />
     </>
   );
