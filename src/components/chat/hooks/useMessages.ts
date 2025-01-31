@@ -68,7 +68,7 @@ export const useMessages = () => {
       setAbortController(controller);
 
       try {
-        const response = await fetch("/api/chat", {
+        const response = await fetch("/api/chat/ai", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -122,12 +122,16 @@ export const useMessages = () => {
           }
         }
       } catch (error) {
-        console.error("Chat error:", error);
-        toast({
-          title: "Error",
-          description: "Failed to send message",
-          variant: "destructive",
-        });
+        if (error instanceof Error && error.name === "AbortError") {
+          console.log("Request aborted");
+        } else {
+          console.error("Chat error:", error);
+          toast({
+            title: "Error",
+            description: "Failed to send message",
+            variant: "destructive",
+          });
+        }
       } finally {
         setIsLoading(false);
         setAbortController(null);
