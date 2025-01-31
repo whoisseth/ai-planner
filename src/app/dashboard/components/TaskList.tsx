@@ -3,15 +3,14 @@
 import { TaskItem, type Task } from "@/components/TaskItem";
 import { updateTask, deleteTask } from "@/app/actions/tasks";
 import { toast } from "sonner";
-import { useAutoAnimate } from '@formkit/auto-animate/react'
-
+import { useAutoAnimate } from "@formkit/auto-animate/react";
 
 interface TaskListProps {
   tasks: Task[];
 }
 
 export function TaskList({ tasks }: TaskListProps) {
-  const [animationParent] = useAutoAnimate()
+  const [animationParent] = useAutoAnimate();
 
   async function handleUpdateTask(taskData: Task) {
     try {

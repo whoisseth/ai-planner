@@ -3,14 +3,7 @@
 import { useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import {
-  MoreHorizontal,
-  Plus,
-  Trash,
-  Calendar,
-  Edit,
-  Info,
-} from "lucide-react";
+import { MoreHorizontal, Plus, Trash, Edit, Info } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -166,7 +159,7 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
   };
 
   return (
-    <div className="group relative flex items-start gap-3 border-b py-2 last:border-b-0 hover:bg-accent/5 px-1">
+    <div className="group relative flex items-start gap-3 border-b px-1 py-2 last:border-b-0 hover:bg-accent/5">
       <TooltipProvider delayDuration={50}>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -176,23 +169,26 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
                 onCheckedChange={handleStatusChange}
                 id={`task-${task.id}`}
                 className={cn(
-                  "h-[18px] w-[18px] rounded-full border-2 transition-colors cursor-pointer",
-                  task.completed ? "bg-primary border-primary" : "border-muted-foreground/20 hover:border-primary/50 group-hover:border-primary/50"
+                  "h-[18px] w-[18px] cursor-pointer rounded-full border-2 transition-colors",
+                  task.completed
+                    ? "border-primary bg-primary"
+                    : "border-muted-foreground/20 hover:border-primary/50 group-hover:border-primary/50",
+                  "",
                 )}
               />
             </div>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="text-xs font-medium">
-            Mark {task.completed ? 'incomplete' : 'completed'}
+            Mark {task.completed ? "incomplete" : "completed"}
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex flex-wrap items-center gap-2">
           <label
             htmlFor={`task-${task.id}`}
             className={cn(
-              "text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 truncate cursor-pointer",
+              "cursor-pointer truncate text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
               task.completed && "text-muted-foreground/50 line-through",
             )}
           >
@@ -200,82 +196,105 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
           </label>
           <div className="flex items-center gap-2">
             <span
-              className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium", {
-                "bg-red-100/90 text-red-700 dark:bg-red-900/40 dark:text-red-300":
-                  task.priority === "Urgent",
-                "bg-yellow-100/90 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300":
-                  task.priority === "High",
-                "bg-blue-100/90 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300":
-                  task.priority === "Medium",
-                "bg-gray-100/90 text-gray-700 dark:bg-gray-900/40 dark:text-gray-300":
-                  task.priority === "Low",
-              })}
+              className={cn(
+                "rounded-full px-2 py-0.5 text-[10px] font-medium",
+                {
+                  "bg-red-100/90 text-red-700 dark:bg-red-900/40 dark:text-red-300":
+                    task.priority === "Urgent",
+                  "bg-yellow-100/90 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300":
+                    task.priority === "High",
+                  "bg-blue-100/90 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300":
+                    task.priority === "Medium",
+                  "bg-gray-100/90 text-gray-700 dark:bg-gray-900/40 dark:text-gray-300":
+                    task.priority === "Low",
+                },
+              )}
             >
               {task.priority}
             </span>
             {(task.dueDate || task.dueTime) && (
-              <span className="flex items-center gap-1 text-[10px] text-muted-foreground/80 bg-muted/50 px-2 py-0.5 rounded-full">
-                <svg className="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10"/>
-                  <polyline points="12 6 12 12 16 14"/>
+              <span className="flex items-center gap-1 rounded-full bg-muted/50 px-2 py-0.5 text-[10px] text-muted-foreground/80">
+                <svg
+                  className="h-2.5 w-2.5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
                 </svg>
                 <span>
                   {task.dueDate && format(task.dueDate, "MMM d")}
-                  {task.dueTime && format(new Date(`2000/01/01 ${task.dueTime}`), " h:mm a")}
+                  {task.dueTime &&
+                    format(new Date(`2000/01/01 ${task.dueTime}`), " h:mm a")}
                 </span>
               </span>
             )}
           </div>
         </div>
         {task.subtasks.length > 0 && (
-          <div className="ml-0.5 mt-1.5 space-y-1">
+          <div className="ml-0.5 mt-2 space-y-1.5">
             {task.subtasks.map((subtask) => (
-              <div key={subtask.id} className="flex items-center gap-2 group/subtask">
+              <div
+                key={subtask.id}
+                className="group/subtask flex items-center gap-2 rounded-md p-1.5 transition-colors hover:bg-accent/30"
+              >
                 <TooltipProvider delayDuration={50}>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div className="relative flex items-center justify-center">
                         <Checkbox
                           checked={subtask.completed}
-                          onCheckedChange={() => handleSubtaskStatusChange(subtask.id)}
+                          onCheckedChange={() =>
+                            handleSubtaskStatusChange(subtask.id)
+                          }
                           id={`subtask-${subtask.id}`}
                           className={cn(
-                            "h-3.5 w-3.5 rounded-full border-[1.5px] transition-colors cursor-pointer",
-                            subtask.completed ? "bg-primary/90 border-primary/90" : "border-muted-foreground/20 hover:border-primary/40 group-hover:border-primary/40"
+                            "h-4 w-4 cursor-pointer rounded-full border-[1.5px] transition-colors",
+                            subtask.completed
+                              ? "border-primary/90 bg-primary/90"
+                              : "border-muted-foreground/30 hover:border-primary/60",
                           )}
                         />
                       </div>
                     </TooltipTrigger>
-                    <TooltipContent side="bottom" className="text-xs font-medium">
-                      Mark {subtask.completed ? 'incomplete' : 'completed'}
+                    <TooltipContent
+                      side="bottom"
+                      className="text-xs font-medium"
+                    >
+                      Mark {subtask.completed ? "incomplete" : "completed"}
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
                 <label
                   htmlFor={`subtask-${subtask.id}`}
                   className={cn(
-                    "flex-grow text-[11px] truncate",
-                    subtask.completed && "text-muted-foreground/50 line-through",
+                    "flex-grow cursor-pointer truncate text-sm",
+                    subtask.completed &&
+                      "text-muted-foreground/60 line-through",
                   )}
                 >
                   {subtask.title}
                 </label>
-                <div className="flex opacity-0 group-hover/subtask:opacity-100 transition-opacity">
+                <div className="flex opacity-0 transition-opacity group-hover/subtask:opacity-100">
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-4 w-4 p-0"
+                    className="h-6 w-6 p-0 text-muted-foreground/70 hover:text-primary"
                     onClick={() => handleEditSubtask(subtask.id)}
                   >
-                    <Edit className="h-2.5 w-2.5" />
+                    <Edit className="h-3.5 w-3.5" />
                   </Button>
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-4 w-4 p-0 text-red-500/70 hover:text-red-600"
+                    className="h-6 w-6 p-0 text-muted-foreground/70 hover:text-red-600"
                     onClick={() => handleDeleteSubtask(subtask.id)}
                   >
-                    <Trash className="h-2.5 w-2.5" />
+                    <Trash className="h-3.5 w-3.5" />
                   </Button>
                 </div>
               </div>
@@ -283,7 +302,7 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
           </div>
         )}
       </div>
-      <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="flex items-center opacity-0 transition-opacity group-hover:opacity-100">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -296,21 +315,30 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-[180px]">
-            <DropdownMenuItem onClick={() => setIsSubtaskDialogOpen(true)} className="text-sm py-2.5 px-3">
+            <DropdownMenuItem
+              onClick={() => setIsSubtaskDialogOpen(true)}
+              className="px-3 py-2.5 text-sm"
+            >
               <Plus className="mr-2 h-4 w-4" />
               Add subtask
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setIsEditDialogOpen(true)} className="text-sm py-2.5 px-3">
+            <DropdownMenuItem
+              onClick={() => setIsEditDialogOpen(true)}
+              className="px-3 py-2.5 text-sm"
+            >
               <Edit className="mr-2 h-4 w-4" />
               Edit task
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setIsDetailsDialogOpen(true)} className="text-sm py-2.5 px-3">
+            <DropdownMenuItem
+              onClick={() => setIsDetailsDialogOpen(true)}
+              className="px-3 py-2.5 text-sm"
+            >
               <Info className="mr-2 h-4 w-4" />
               View details
             </DropdownMenuItem>
             <DropdownMenuSeparator className="my-1" />
             <DropdownMenuItem
-              className="text-destructive text-sm py-2.5 px-3"
+              className="px-3 py-2.5 text-sm text-destructive"
               onClick={() => onDelete(task.id)}
             >
               <Trash className="mr-2 h-4 w-4" />
