@@ -77,6 +77,12 @@ export function AddTaskDialog({
               onChange={(e) =>
                 setNewTask({ ...newTask, title: e.target.value })
               }
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleAddTask();
+                }
+              }}
             />
           </div>
           <div className="grid gap-2">

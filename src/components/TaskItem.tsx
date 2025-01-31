@@ -365,6 +365,12 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
                 onChange={(e) =>
                   setEditedTask({ ...editedTask, title: e.target.value })
                 }
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleSaveEdit();
+                  }
+                }}
               />
             </div>
             <div className="grid gap-2">
@@ -439,6 +445,12 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
                 id="subtask"
                 value={newSubtask}
                 onChange={(e) => setNewSubtask(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAddSubtask();
+                  }
+                }}
               />
             </div>
           </div>
@@ -511,6 +523,12 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
                 id="editSubtask"
                 value={editedSubtaskTitle}
                 onChange={(e) => setEditedSubtaskTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleSaveSubtaskEdit();
+                  }
+                }}
               />
             </div>
           </div>
