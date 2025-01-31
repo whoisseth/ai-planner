@@ -17,7 +17,7 @@ export default function Header() {
   const { setTheme, theme } = useTheme();
 
   return (
-    <header className="flex h-full max-h-14 items-center gap-4 border-b bg-gray-100/40 px-6 dark:bg-gray-800/40 lg:h-[60px]">
+    <header className="flex h-full max-h-14 items-center gap-4 border-b px-6 lg:h-[60px]">
       <div className="flex-1">
         <h1 className="text-lg font-semibold">AI Planner</h1>
       </div>

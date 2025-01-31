@@ -42,12 +42,16 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useOptimistic, startTransition } from "react";
 
 export type Priority = "Low" | "Medium" | "High" | "Urgent";
 export type SubTask = {
   id: string;
   title: string;
   completed: boolean;
+  createdAt: Date | null;
+  updatedAt: Date | null;
+  taskId: string;
 };
 
 export type Task = {
@@ -55,8 +59,11 @@ export type Task = {
   title: string;
   completed: boolean;
   priority: Priority;
-  dueDate?: Date;
-  dueTime?: string;
+  dueDate: Date | null;
+  dueTime: string | null;
+  userId: number;
+  createdAt: Date | null;
+  updatedAt: Date | null;
   subtasks: SubTask[];
 };
 
@@ -66,25 +73,75 @@ interface TaskItemProps {
   onDelete: (id: string) => void;
 }
 
-export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
+export function TaskItem({
+  task: initialTask,
+  onUpdate,
+  onDelete,
+}: TaskItemProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isSubtaskDialogOpen, setIsSubtaskDialogOpen] = useState(false);
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
-  const [editedTask, setEditedTask] = useState(task);
+  const [editedTask, setEditedTask] = useState(initialTask);
   const [newSubtask, setNewSubtask] = useState("");
   const [editingSubtaskId, setEditingSubtaskId] = useState<string | null>(null);
   const [editedSubtaskTitle, setEditedSubtaskTitle] = useState("");
 
+  const [optimisticTask, addOptimisticTask] = useOptimistic(
+    initialTask,
+    (state: Task, optimisticUpdate: { type: string; data: any }) => {
+      switch (optimisticUpdate.type) {
+        case "update":
+          return { ...state, ...optimisticUpdate.data };
+        case "addSubtask":
+          return {
+            ...state,
+            subtasks: [...state.subtasks, optimisticUpdate.data],
+          };
+        case "updateSubtask":
+          return {
+            ...state,
+            subtasks: state.subtasks.map((subtask) =>
+              subtask.id === optimisticUpdate.data.id
+                ? { ...subtask, ...optimisticUpdate.data }
+                : subtask,
+            ),
+          };
+        case "deleteSubtask":
+          return {
+            ...state,
+            subtasks: state.subtasks.filter(
+              (subtask) => subtask.id !== optimisticUpdate.data,
+            ),
+          };
+        default:
+          return state;
+      }
+    },
+  );
+
   const handleStatusChange = () => {
-    console.log("Toggling task:", task.id, "Current status:", task.completed);
-    onUpdate({ ...task, completed: !task.completed });
+    const updatedTask = {
+      ...optimisticTask,
+      completed: !optimisticTask.completed,
+      updatedAt: new Date(),
+    };
+    startTransition(() => {
+      onUpdate(updatedTask);
+    });
   };
 
   const handleSaveEdit = async () => {
     try {
-      await onUpdate(editedTask);
+      const updatedTask = {
+        ...editedTask,
+        dueDate: editedTask.dueDate || null,
+        dueTime: editedTask.dueTime || null,
+        updatedAt: new Date(),
+      };
+      startTransition(() => {
+        onUpdate(updatedTask);
+      });
       setIsEditDialogOpen(false);
-      toast.success("Task updated successfully");
     } catch (error) {
       toast.error("Failed to update task");
       console.error("Failed to update task:", error);
@@ -98,7 +155,24 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
           title: newSubtask,
           completed: false,
         };
-        await createSubtask(task.id, subtaskData);
+
+        // Create an optimistic subtask
+        const optimisticSubtask: SubTask = {
+          id: `temp-${Date.now()}`,
+          title: newSubtask,
+          completed: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          taskId: optimisticTask.id,
+        };
+
+        // Update the UI optimistically within a transition
+        startTransition(() => {
+          addOptimisticTask({ type: "addSubtask", data: optimisticSubtask });
+        });
+
+        // Make the actual API call
+        await createSubtask(optimisticTask.id, subtaskData);
         setNewSubtask("");
         setIsSubtaskDialogOpen(false);
         toast.success("Subtask added successfully");
@@ -111,9 +185,22 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
 
   const handleSubtaskStatusChange = async (subtaskId: string) => {
     try {
-      const subtask = task.subtasks.find((st) => st.id === subtaskId);
+      const subtask = optimisticTask.subtasks.find((st) => st.id === subtaskId);
       if (subtask) {
-        await updateSubtask(task.id, subtaskId, {
+        // Create an optimistic update
+        const optimisticUpdate = {
+          ...subtask,
+          completed: !subtask.completed,
+          updatedAt: new Date(),
+        };
+
+        // Update the UI optimistically within a transition
+        startTransition(() => {
+          addOptimisticTask({ type: "updateSubtask", data: optimisticUpdate });
+        });
+
+        // Make the actual API call
+        await updateSubtask(optimisticTask.id, subtaskId, {
           completed: !subtask.completed,
         });
         toast.success("Subtask updated successfully");
@@ -125,7 +212,7 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
   };
 
   const handleEditSubtask = (subtaskId: string) => {
-    const subtask = task.subtasks.find((st) => st.id === subtaskId);
+    const subtask = optimisticTask.subtasks.find((st) => st.id === subtaskId);
     if (subtask) {
       setEditingSubtaskId(subtaskId);
       setEditedSubtaskTitle(subtask.title);
@@ -135,7 +222,20 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
   const handleSaveSubtaskEdit = async () => {
     if (editingSubtaskId && editedSubtaskTitle.trim()) {
       try {
-        await updateSubtask(task.id, editingSubtaskId, {
+        // Create an optimistic update
+        const optimisticUpdate = {
+          id: editingSubtaskId,
+          title: editedSubtaskTitle,
+          updatedAt: new Date(),
+        };
+
+        // Update the UI optimistically within a transition
+        startTransition(() => {
+          addOptimisticTask({ type: "updateSubtask", data: optimisticUpdate });
+        });
+
+        // Make the actual API call
+        await updateSubtask(optimisticTask.id, editingSubtaskId, {
           title: editedSubtaskTitle,
         });
         setEditingSubtaskId(null);
@@ -150,7 +250,13 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
 
   const handleDeleteSubtask = async (subtaskId: string) => {
     try {
-      await deleteSubtask(task.id, subtaskId);
+      // Update the UI optimistically within a transition
+      startTransition(() => {
+        addOptimisticTask({ type: "deleteSubtask", data: subtaskId });
+      });
+
+      // Make the actual API call
+      await deleteSubtask(optimisticTask.id, subtaskId);
       toast.success("Subtask deleted successfully");
     } catch (error) {
       toast.error("Failed to delete subtask");
@@ -165,12 +271,12 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
           <TooltipTrigger asChild>
             <div className="relative flex items-center justify-center pt-0.5">
               <Checkbox
-                checked={task.completed}
+                checked={optimisticTask.completed}
                 onCheckedChange={handleStatusChange}
-                id={`task-${task.id}`}
+                id={`task-${optimisticTask.id}`}
                 className={cn(
                   "h-[18px] w-[18px] cursor-pointer rounded-full border-2 transition-colors",
-                  task.completed
+                  optimisticTask.completed
                     ? "border-primary bg-primary"
                     : "border-muted-foreground/20 hover:border-primary/50 group-hover:border-primary/50",
                   "",
@@ -179,20 +285,21 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
             </div>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="text-xs font-medium">
-            Mark {task.completed ? "incomplete" : "completed"}
+            Mark {optimisticTask.completed ? "incomplete" : "completed"}
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <label
-            htmlFor={`task-${task.id}`}
+            htmlFor={`task-${optimisticTask.id}`}
             className={cn(
               "cursor-pointer truncate text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
-              task.completed && "text-muted-foreground/50 line-through",
+              optimisticTask.completed &&
+                "text-muted-foreground/50 line-through",
             )}
           >
-            {task.title}
+            {optimisticTask.title}
           </label>
           <div className="flex items-center gap-2">
             <span
@@ -200,19 +307,19 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
                 "rounded-full px-2 py-0.5 text-[10px] font-medium",
                 {
                   "bg-red-100/90 text-red-700 dark:bg-red-900/40 dark:text-red-300":
-                    task.priority === "Urgent",
+                    optimisticTask.priority === "Urgent",
                   "bg-yellow-100/90 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300":
-                    task.priority === "High",
+                    optimisticTask.priority === "High",
                   "bg-blue-100/90 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300":
-                    task.priority === "Medium",
+                    optimisticTask.priority === "Medium",
                   "bg-gray-100/90 text-gray-700 dark:bg-gray-900/40 dark:text-gray-300":
-                    task.priority === "Low",
+                    optimisticTask.priority === "Low",
                 },
               )}
             >
-              {task.priority}
+              {optimisticTask.priority}
             </span>
-            {(task.dueDate || task.dueTime) && (
+            {(optimisticTask.dueDate || optimisticTask.dueTime) && (
               <span className="flex items-center gap-1 rounded-full bg-muted/50 px-2 py-0.5 text-[10px] text-muted-foreground/80">
                 <svg
                   className="h-2.5 w-2.5"
@@ -227,17 +334,21 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
                   <polyline points="12 6 12 12 16 14" />
                 </svg>
                 <span>
-                  {task.dueDate && format(task.dueDate, "MMM d")}
-                  {task.dueTime &&
-                    format(new Date(`2000/01/01 ${task.dueTime}`), " h:mm a")}
+                  {optimisticTask.dueDate &&
+                    format(optimisticTask.dueDate, "MMM d")}
+                  {optimisticTask.dueTime &&
+                    format(
+                      new Date(`2000/01/01 ${optimisticTask.dueTime}`),
+                      " h:mm a",
+                    )}
                 </span>
               </span>
             )}
           </div>
         </div>
-        {task.subtasks.length > 0 && (
+        {optimisticTask.subtasks.length > 0 && (
           <div className="ml-0.5 mt-2 space-y-1.5">
-            {task.subtasks.map((subtask) => (
+            {optimisticTask.subtasks.map((subtask) => (
               <div
                 key={subtask.id}
                 className="group/subtask flex items-center gap-2 rounded-md p-1.5 transition-colors hover:bg-accent/30"
@@ -251,12 +362,11 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
                           onCheckedChange={() =>
                             handleSubtaskStatusChange(subtask.id)
                           }
-                          id={`subtask-${subtask.id}`}
                           className={cn(
-                            "h-4 w-4 cursor-pointer rounded-full border-[1.5px] transition-colors",
+                            "h-[14px] w-[14px] cursor-pointer rounded-full border transition-colors",
                             subtask.completed
-                              ? "border-primary/90 bg-primary/90"
-                              : "border-muted-foreground/30 hover:border-primary/60",
+                              ? "border-primary bg-primary"
+                              : "border-muted-foreground/20 hover:border-primary/50 group-hover/subtask:border-primary/50",
                           )}
                         />
                       </div>
@@ -269,34 +379,59 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
-                <label
-                  htmlFor={`subtask-${subtask.id}`}
-                  className={cn(
-                    "flex-grow cursor-pointer truncate text-sm",
-                    subtask.completed &&
-                      "text-muted-foreground/60 line-through",
-                  )}
-                >
-                  {subtask.title}
-                </label>
-                <div className="flex opacity-0 transition-opacity group-hover/subtask:opacity-100">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0 text-muted-foreground/70 hover:text-primary"
-                    onClick={() => handleEditSubtask(subtask.id)}
-                  >
-                    <Edit className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0 text-muted-foreground/70 hover:text-red-600"
-                    onClick={() => handleDeleteSubtask(subtask.id)}
-                  >
-                    <Trash className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
+                {editingSubtaskId === subtask.id ? (
+                  <div className="flex flex-1 items-center gap-2">
+                    <Input
+                      value={editedSubtaskTitle}
+                      onChange={(e) => setEditedSubtaskTitle(e.target.value)}
+                      className="h-7"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleSaveSubtaskEdit();
+                        }
+                      }}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={handleSaveSubtaskEdit}
+                    >
+                      <Edit className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <span
+                      className={cn(
+                        "flex-1 text-xs",
+                        subtask.completed &&
+                          "text-muted-foreground/50 line-through",
+                      )}
+                    >
+                      {subtask.title}
+                    </span>
+                    <div className="flex opacity-0 transition-opacity group-hover/subtask:opacity-100">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => handleEditSubtask(subtask.id)}
+                      >
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => handleDeleteSubtask(subtask.id)}
+                      >
+                        <Trash className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </>
+                )}
               </div>
             ))}
           </div>
@@ -339,7 +474,7 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
             <DropdownMenuSeparator className="my-1" />
             <DropdownMenuItem
               className="px-3 py-2.5 text-sm text-destructive"
-              onClick={() => onDelete(task.id)}
+              onClick={() => onDelete(optimisticTask.id)}
             >
               <Trash className="mr-2 h-4 w-4" />
               Delete
@@ -405,9 +540,7 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
                 onChange={(e) =>
                   setEditedTask({
                     ...editedTask,
-                    dueDate: e.target.value
-                      ? new Date(e.target.value)
-                      : undefined,
+                    dueDate: e.target.value ? new Date(e.target.value) : null,
                   })
                 }
               />
@@ -435,7 +568,7 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
           <DialogHeader>
             <DialogTitle>Add Subtask</DialogTitle>
             <DialogDescription>
-              Add a new subtask to "{task.title}"
+              Add a new subtask to "{optimisticTask.title}"
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -468,33 +601,33 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
           <div className="grid gap-4 py-4">
             <div>
               <Label className="font-bold">Title</Label>
-              <p>{task.title}</p>
+              <p>{optimisticTask.title}</p>
             </div>
             <div>
               <Label className="font-bold">Priority</Label>
-              <p>{task.priority}</p>
+              <p>{optimisticTask.priority}</p>
             </div>
             <div>
               <Label className="font-bold">Due Date</Label>
               <p>
-                {task.dueDate
-                  ? format(task.dueDate, "MMMM d, yyyy")
+                {optimisticTask.dueDate
+                  ? format(optimisticTask.dueDate, "MMMM d, yyyy")
                   : "Not set"}
               </p>
             </div>
             <div>
               <Label className="font-bold">Due Time</Label>
-              <p>{task.dueTime || "Not set"}</p>
+              <p>{optimisticTask.dueTime || "Not set"}</p>
             </div>
             <div>
               <Label className="font-bold">Status</Label>
-              <p>{task.completed ? "Completed" : "Active"}</p>
+              <p>{optimisticTask.completed ? "Completed" : "Active"}</p>
             </div>
-            {task.subtasks.length > 0 && (
+            {optimisticTask.subtasks.length > 0 && (
               <div>
                 <Label className="font-bold">Subtasks</Label>
                 <ul className="list-disc pl-5">
-                  {task.subtasks.map((subtask) => (
+                  {optimisticTask.subtasks.map((subtask) => (
                     <li
                       key={subtask.id}
                       className={subtask.completed ? "line-through" : ""}
@@ -506,35 +639,6 @@ export function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
               </div>
             )}
           </div>
-        </DialogContent>
-      </Dialog>
-      <Dialog
-        open={!!editingSubtaskId}
-        onOpenChange={() => setEditingSubtaskId(null)}
-      >
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Edit Subtask</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="editSubtask">Subtask Title</Label>
-              <Input
-                id="editSubtask"
-                value={editedSubtaskTitle}
-                onChange={(e) => setEditedSubtaskTitle(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    handleSaveSubtaskEdit();
-                  }
-                }}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button onClick={handleSaveSubtaskEdit}>Save changes</Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

@@ -20,12 +20,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Task } from "./TaskItem";
-import { toast } from "sonner";
 
 interface AddTaskDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddTask: (task: Omit<Task, "id" | "subtasks">) => void;
+  onAddTask: (
+    task: Omit<Task, "id" | "subtasks" | "userId" | "createdAt" | "updatedAt">,
+  ) => void;
 }
 
 export function AddTaskDialog({
@@ -34,12 +35,15 @@ export function AddTaskDialog({
   onAddTask,
 }: AddTaskDialogProps) {
   const [newTask, setNewTask] = useState<
-    Omit<Task, "id" | "completed" | "subtasks">
+    Omit<
+      Task,
+      "id" | "completed" | "subtasks" | "userId" | "createdAt" | "updatedAt"
+    >
   >({
     title: "",
     priority: "Medium",
-    dueDate: undefined,
-    dueTime: undefined,
+    dueDate: null,
+    dueTime: null,
   });
 
   const handleAddTask = () => {
@@ -51,10 +55,9 @@ export function AddTaskDialog({
       setNewTask({
         title: "",
         priority: "Medium",
-        dueDate: undefined,
-        dueTime: undefined,
+        dueDate: null,
+        dueTime: null,
       });
-      toast.success("Task added successfully");
       onClose();
     }
   };
@@ -112,9 +115,7 @@ export function AddTaskDialog({
               onChange={(e) =>
                 setNewTask({
                   ...newTask,
-                  dueDate: e.target.value
-                    ? new Date(e.target.value)
-                    : undefined,
+                  dueDate: e.target.value ? new Date(e.target.value) : null,
                 })
               }
             />
@@ -125,7 +126,7 @@ export function AddTaskDialog({
               id="dueTime"
               type="time"
               onChange={(e) =>
-                setNewTask({ ...newTask, dueTime: e.target.value })
+                setNewTask({ ...newTask, dueTime: e.target.value || null })
               }
             />
           </div>
@@ -135,5 +136,31 @@ export function AddTaskDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+export function AddTaskButton({
+  onAddTask,
+}: {
+  onAddTask: AddTaskDialogProps["onAddTask"];
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setIsOpen(true)}
+        className="h-7 px-3"
+      >
+        Add task
+      </Button>
+      <AddTaskDialog
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+        onAddTask={onAddTask}
+      />
+    </>
   );
 }
