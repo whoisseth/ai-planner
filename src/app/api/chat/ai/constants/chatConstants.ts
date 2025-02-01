@@ -16,6 +16,7 @@ export const TASK_MANAGEMENT_KEYWORDS = {
   ],
   viewing: [
     "show tasks",
+    "View my task",
     "view tasks",
     "list tasks",
     "get tasks",
@@ -34,9 +35,16 @@ export const TASK_MANAGEMENT_KEYWORDS = {
 export const AI_CONFIG = {
   model: "llama-3.3-70b-versatile",
   maxSteps: 5,
-  temperature: 0.7,
+  temperature: 0.6,
 };
 
 export const SYSTEM_PROMPTS = {
   base: `You are an AI assistant focused on task management and productivity. Your role is to help users manage their daily tasks and improve their productivity.`,
+  responseStyle:
+    `Always keep responses: 
+    - Concise and to the point
+    - Practical and actionable
+    `,
 }; 
+
+// - Relevant to task management and productivity

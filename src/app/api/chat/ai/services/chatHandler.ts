@@ -19,7 +19,7 @@ async function generateAIResponse(
     messages: [
       {
         role: "system",
-        content: `${SYSTEM_PROMPTS.base}
+        content: `${SYSTEM_PROMPTS.base} & ${SYSTEM_PROMPTS.responseStyle}
         Previous context from our conversation: ${context}
         ${
           shouldIncludeTaskTools
