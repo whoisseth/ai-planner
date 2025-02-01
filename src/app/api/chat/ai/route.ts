@@ -5,6 +5,100 @@ import { z } from "zod";
 import { createTask } from "@/app/actions/tasks";
 import { Message } from "ai";
 import { getCurrentUser } from "@/lib/session";
+import { Pinecone } from "@pinecone-database/pinecone";
+import { CohereClient } from "cohere-ai";
+import { db } from "@/db";
+import { chatMessages } from "@/db/schema";
+
+// Initialize Pinecone client
+const pinecone = new Pinecone({
+  apiKey: process.env.PINECONE_API_KEY || "",
+});
+
+// Initialize Cohere client
+const cohere = new CohereClient({
+  token: process.env.COHERE_API_KEY || "",
+});
+
+// Initialize Pinecone index
+const pineconeIndex = pinecone.Index(process.env.PINECONE_INDEX || "");
+
+// Helper function to get embedding vector
+async function getEmbedding(text: string): Promise<number[]> {
+  const response = await cohere.embed({
+    texts: [text],
+    model: "embed-english-v3.0",
+    inputType: "search_query",
+  });
+
+  if (!response.embeddings || !Array.isArray(response.embeddings)) {
+    throw new Error("Invalid embedding response");
+  }
+
+  const embedding = response.embeddings[0];
+  if (!Array.isArray(embedding)) {
+    throw new Error("Invalid embedding format");
+  }
+
+  return embedding;
+}
+
+// Helper function to save messages and their embeddings
+async function saveMessageWithEmbedding(
+  userId: number,
+  content: string,
+  role: "user" | "assistant",
+) {
+  // Generate embedding for the message
+  const embedding = await getEmbedding(content);
+
+  // Save message to chat history
+  const [message] = await db
+    .insert(chatMessages)
+    .values({
+      userId,
+      content,
+      role,
+      contextId: crypto.randomUUID(),
+    })
+    .returning();
+
+  // Save embedding to Pinecone
+  await pineconeIndex.upsert([
+    {
+      id: message.id.toString(),
+      values: embedding,
+      metadata: {
+        userId: userId.toString(),
+        content,
+        role,
+        timestamp: new Date().toISOString(),
+      },
+    },
+  ]);
+
+  return message;
+}
+
+// Helper function to get relevant context
+async function getRelevantContext(userId: number, query: string) {
+  // Generate embedding for the query
+  const embedding = await getEmbedding(query);
+
+  // Query Pinecone for similar messages
+  const results = await pineconeIndex.query({
+    vector: embedding,
+    filter: { userId: userId.toString() },
+    topK: 5,
+    includeMetadata: true,
+  });
+
+  // Format context from similar messages
+  return results.matches
+    .map((match) => match.metadata?.content)
+    .filter(Boolean)
+    .join("\n");
+}
 
 // Define the task creation tool
 const createTaskTool = {
@@ -73,7 +167,10 @@ export async function POST(req: Request) {
     // Function to send a streaming message
     const sendStream = async (content: string, isComplete = false) => {
       const data = {
+        id: crypto.randomUUID(),
+        role: "assistant",
         content,
+        createdAt: new Date(),
         isComplete,
         isStreaming: !isComplete,
       };
@@ -83,10 +180,24 @@ export async function POST(req: Request) {
     // Process the response in the background
     (async () => {
       try {
-        // Generate response using Groq
+        // Save user message with embedding
+        await saveMessageWithEmbedding(user.id, lastMessage.content, "user");
+
+        // Get relevant context from previous messages
+        const context = await getRelevantContext(user.id, lastMessage.content);
+
+        // Generate response using Groq with context
         const response = await generateText({
           model: groq("llama-3.3-70b-versatile"),
-          messages: messages as Message[],
+          messages: [
+            {
+              role: "system",
+              content: `You are an AI assistant for task management and productivity.
+                Previous context: ${context}
+                Keep responses concise, logical, simple, and to the point.`,
+            },
+            ...messages,
+          ] as Message[],
           tools: {
             createTask: tool(createTaskTool),
           },
@@ -94,9 +205,11 @@ export async function POST(req: Request) {
           temperature: 0.7,
         });
 
+        // Save assistant response with embedding
+        await saveMessageWithEmbedding(user.id, response.text, "assistant");
+
         // Stream the response
         await sendStream(response.text, true);
-        console.log("response.text", response.text);
         await writer.close();
       } catch (error) {
         console.error("Error generating response:", error);
