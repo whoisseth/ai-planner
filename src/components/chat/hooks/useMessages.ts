@@ -69,7 +69,7 @@ export const useMessages = () => {
 
       try {
         // const response = await fetch("/api/chat", {
-          const response = await fetch("/api/chat/ai", {
+        const response = await fetch("/api/chat/ai", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
