@@ -67,6 +67,7 @@ export async function POST(req: Request) {
 
         // Get relevant context from previous messages
         const context = await getRelevantContext(user.id, lastMessage.content);
+        console.log("context- ", context);
 
         // Check if the message indicates task creation intent
         const shouldIncludeTaskTool = isTaskCreationIntent(lastMessage.content);
@@ -78,10 +79,25 @@ export async function POST(req: Request) {
           messages: [
             {
               role: "system",
-              content: `You are an AI assistant for task management and productivity.
-                Previous context: ${context}
-                Keep responses concise, logical, simple, and to the point.
-                ${shouldIncludeTaskTool ? "You can help create tasks when requested." : "For task creation, users should explicitly mention they want to create a task."}`,
+              content: `You are an AI assistant focused on task management and productivity. Your role is to help users manage their daily tasks and improve their productivity.
+
+                Previous context from our conversation: ${context}
+
+                When users want to create tasks:
+                - If they explicitly ask to create a task, you can help create it directly
+                - If they mention activities or todos without explicitly requesting task creation, suggest creating a task for it
+                
+                For general productivity questions:
+                - Provide practical advice and suggestions
+                - Draw from productivity best practices and time management techniques
+                - Keep responses focused on actionable steps
+                
+                Always keep responses:
+                - Concise and to the point
+                - Practical and actionable
+                - Relevant to task management and productivity
+                
+                ${shouldIncludeTaskTool ? "You have access to task creation capabilities - use them when appropriate." : "Guide users to explicitly request task creation when needed."}`,
             },
             ...messages,
           ] as Message[],
