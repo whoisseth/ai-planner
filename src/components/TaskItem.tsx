@@ -335,7 +335,7 @@ export function TaskItem({
                 </svg>
                 <span>
                   {optimisticTask.dueDate &&
-                    format(optimisticTask.dueDate, "MMM d")}
+                    format(optimisticTask.dueDate, "d MMM,")}
                   {optimisticTask.dueTime &&
                     format(
                       new Date(`2000/01/01 ${optimisticTask.dueTime}`),

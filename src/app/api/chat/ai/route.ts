@@ -1,6 +1,6 @@
 // src/app/api/chat/ai/route.ts
 import { groq } from "@ai-sdk/groq";
-import { generateText, tool } from "ai";
+import { generateText, tool, streamText } from "ai";
 import { Message } from "ai";
 import { getCurrentUser } from "@/lib/session";
 import { createTaskTool } from "./services/taskTool";
@@ -8,6 +8,26 @@ import {
   saveMessageWithEmbedding,
   getRelevantContext,
 } from "./services/embeddings";
+
+// Helper function to detect if message indicates task creation intent
+function isTaskCreationIntent(message: string): boolean {
+  const taskCreationKeywords = [
+    "create task",
+    "add task",
+    "new task",
+    "make task",
+    "schedule task",
+    "remind me to",
+    "set reminder",
+    "add to my list",
+    "add to todo",
+  ];
+
+  const lowercaseMessage = message.toLowerCase();
+  return taskCreationKeywords.some((keyword) =>
+    lowercaseMessage.includes(keyword),
+  );
+}
 
 export async function POST(req: Request) {
   const user = await getCurrentUser();
@@ -18,6 +38,8 @@ export async function POST(req: Request) {
   try {
     const { messages } = await req.json();
     const lastMessage = messages[messages.length - 1];
+
+    console.log("Processing chat request. Last message:", lastMessage.content);
 
     // Create a new TransformStream for streaming responses
     const encoder = new TextEncoder();
@@ -46,6 +68,10 @@ export async function POST(req: Request) {
         // Get relevant context from previous messages
         const context = await getRelevantContext(user.id, lastMessage.content);
 
+        // Check if the message indicates task creation intent
+        const shouldIncludeTaskTool = isTaskCreationIntent(lastMessage.content);
+        console.log("Task creation intent detected:", shouldIncludeTaskTool);
+
         // Generate response using Groq with context
         const response = await generateText({
           model: groq("llama-3.3-70b-versatile"),
@@ -54,13 +80,16 @@ export async function POST(req: Request) {
               role: "system",
               content: `You are an AI assistant for task management and productivity.
                 Previous context: ${context}
-                Keep responses concise, logical, simple, and to the point.`,
+                Keep responses concise, logical, simple, and to the point.
+                ${shouldIncludeTaskTool ? "You can help create tasks when requested." : "For task creation, users should explicitly mention they want to create a task."}`,
             },
             ...messages,
           ] as Message[],
-          tools: {
-            createTask: tool(createTaskTool),
-          },
+          tools: shouldIncludeTaskTool
+            ? {
+                createTaskTool,
+              }
+            : undefined,
           maxSteps: 5,
           temperature: 0.7,
         });
@@ -73,7 +102,10 @@ export async function POST(req: Request) {
         await writer.close();
       } catch (error) {
         console.error("Error generating response:", error);
-        const errorMessage = "Failed to generate response";
+        const errorMessage =
+          error instanceof Error
+            ? `Failed to generate response: ${error.message}`
+            : "Failed to generate response";
         await sendStream(errorMessage, true);
         await writer.close();
       }
