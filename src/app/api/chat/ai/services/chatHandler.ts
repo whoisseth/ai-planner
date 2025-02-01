@@ -68,11 +68,36 @@ async function processResponse(
       shouldIncludeTaskTools
     );
 
+    // Check if a task was created and get the task title
+    let taskTitle = "";
+    const hasTaskCreation = response.toolCalls?.some((call: any) => {
+      if (call.toolName === 'createTaskTool' || call.type === 'tool-call') {
+        try {
+          const args = typeof call.args === 'string' ? JSON.parse(call.args) : call.args;
+          taskTitle = args.title || "";
+          return true;
+        } catch (e) {
+          return true;
+        }
+      }
+      return false;
+    });
+
     // Save assistant response
     await saveMessageWithEmbedding(userId, response.text, "assistant");
 
-    // Stream response
-    await streamHandlers.sendMessage(response.text, true);
+    if (hasTaskCreation) {
+      // For task creation, only send a simple success message with the task name
+      await streamHandlers.sendMessage(JSON.stringify({
+        type: 'task_created',
+        isComplete: true,
+        content: `✅ Task "${taskTitle}" has been created successfully!`
+      }), true);
+    } else {
+      // For non-task responses, send the text directly
+      await streamHandlers.sendMessage(response.text, true);
+    }
+    
     await streamHandlers.close();
   } catch (error) {
     console.error("Error generating response:", error);
@@ -93,6 +118,17 @@ export async function handleChatRequest(
   messages: Message[]
 ): Promise<Response> {
   const streamHandlers = createStreamHandlers();
+  
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return new Response(
+      JSON.stringify({ error: "Invalid or empty messages array" }),
+      {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  }
+
   const lastMessage = messages[messages.length - 1];
 
   try {

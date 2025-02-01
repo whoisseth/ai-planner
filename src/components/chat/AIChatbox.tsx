@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -25,6 +26,7 @@ import { chatStyles } from "./styles";
 import VoiceStyle from "./VoiceStyle";
 
 export function AIChatbox() {
+  const router = useRouter();
   const {
     isOpen,
     setIsOpen,
@@ -69,11 +71,13 @@ export function AIChatbox() {
       console.log("Component opened, loading initial messages");
       setIsLoadingHistory(true);
       loadMessages();
+      // Refresh the page data when messages are loaded
+      router.refresh();
     } else {
       // Reset states when closing
       setInputValue("");
     }
-  }, [isOpen, loadMessages, setIsLoadingHistory]);
+  }, [isOpen, loadMessages, setIsLoadingHistory, router]);
 
   // Handle scroll to load more messages
   useEffect(() => {
@@ -84,9 +88,11 @@ export function AIChatbox() {
         !lastMessage.createdAt
       ) {
         scrollToBottom();
+        // Refresh the page data when new messages are added
+        router.refresh();
       }
     }
-  }, [chatMessages, isLoadingHistory, isLoadingMore, scrollToBottom]);
+  }, [chatMessages, isLoadingHistory, isLoadingMore, scrollToBottom, router]);
 
   // Preserve scroll position when loading more messages
   useEffect(() => {

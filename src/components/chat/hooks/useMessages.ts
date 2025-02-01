@@ -3,8 +3,10 @@
 import { useState, useCallback, useRef } from "react";
 import { toast } from "@/components/ui/use-toast";
 import { ChatMessage, ChatHistoryResponse } from "../types";
+import { useRouter } from "next/navigation";
 
 export const useMessages = () => {
+  const router = useRouter();
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
@@ -58,66 +60,62 @@ export const useMessages = () => {
 
   const sendMessage = useCallback(
     async (userMessage: string) => {
-      setIsLoading(true);
-      setChatMessages((prev) => [
-        ...prev,
-        { role: "user", content: userMessage },
-      ]);
-
-      const controller = new AbortController();
-      setAbortController(controller);
-
       try {
-        // const response = await fetch("/api/chat", {
+        setIsLoading(true);
+        
+        // Add user message to chat immediately
+        const userMessageObj = { role: "user", content: userMessage };
+        setChatMessages(prev => [...prev, userMessageObj]);
+
         const response = await fetch("/api/chat/ai", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            messages: [...chatMessages, { role: "user", content: userMessage }],
+          body: JSON.stringify({ 
+            message: userMessage,
+            messages: [...chatMessages, userMessageObj]
           }),
-          signal: controller.signal,
         });
 
         if (!response.ok) throw new Error("Failed to send message");
+
         const reader = response.body?.getReader();
         if (!reader) throw new Error("No reader available");
-
-        let currentMessage = {
-          role: "assistant",
-          content: "",
-        };
-
-        setChatMessages((prev) => [...prev, currentMessage]);
 
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
-          const chunk = new TextDecoder().decode(value);
-          const lines = chunk.split("\n");
+          const text = new TextDecoder().decode(value);
+          const lines = text.split("\n").filter(Boolean);
 
           for (const line of lines) {
             if (line.startsWith("data: ")) {
-              const data = line.slice(5).trim();
-              if (data === "[DONE]") continue;
-
+              const data = line.slice(5);
               try {
-                const parsed = JSON.parse(data);
-
-                if (parsed.isComplete) {
-                  setChatMessages((prev) => [
-                    ...prev.slice(0, -1),
-                    { role: "assistant", content: parsed.content },
+                // Try to parse as JSON first
+                const parsedData = JSON.parse(data);
+                if (parsedData.type === 'task_created') {
+                  // Task was created, trigger UI refresh and show success message
+                  router.refresh();
+                  setChatMessages(prev => [
+                    ...prev,
+                    { role: "assistant", content: parsedData.content }
                   ]);
-                } else if (parsed.isStreaming) {
-                  setChatMessages((prev) => [
-                    ...prev.slice(0, -1),
-                    { ...currentMessage, content: parsed.content },
+                  // Exit early since we don't want to show any other messages
+                  return;
+                } else if (parsedData.isComplete && !parsedData.type) {
+                  // Only show non-task messages if they're complete and not task-related
+                  setChatMessages(prev => [
+                    ...prev,
+                    { role: "assistant", content: parsedData.content }
                   ]);
-                  currentMessage.content = parsed.content;
                 }
               } catch (e) {
-                console.error("Failed to process chunk:", e);
+                // If not JSON, treat as plain text for non-task messages
+                setChatMessages(prev => [
+                  ...prev,
+                  { role: "assistant", content: data }
+                ]);
               }
             }
           }
@@ -138,7 +136,7 @@ export const useMessages = () => {
         setAbortController(null);
       }
     },
-    [chatMessages],
+    [chatMessages, router],
   );
 
   const stopResponse = useCallback(() => {
