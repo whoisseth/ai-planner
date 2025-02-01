@@ -1,7 +1,9 @@
 import { z } from "zod";
-import { createTask } from "@/app/actions/tasks";
+import { createTask, getTasks } from "@/app/actions/tasks";
 import { getCurrentUser } from "@/lib/session";
 import { tool } from "ai";
+import { Task } from "@/components/TaskItem";
+import { revalidatePath } from "next/cache";
 
 // Define the task creation tool
 export const createTaskTool = tool({
@@ -78,6 +80,7 @@ export const createTaskTool = tool({
       console.log("Processed task data:", taskData);
 
       const task = await createTask(taskData);
+      revalidatePath("/");
       console.log("Task created successfully:", task);
 
       return {
@@ -88,6 +91,104 @@ export const createTaskTool = tool({
     } catch (error: any) {
       console.error("Error in createTaskTool:", error);
       throw new Error(`Failed to create task: ${error.message}`);
+    }
+  },
+});
+
+//  Define the to Get the task  tool
+export const getTasksTool = tool({
+  type: "function",
+  description: "Get all tasks from the database with optional filtering",
+  parameters: z.object({
+    includeCompleted: z
+      .boolean()
+      .optional()
+      .describe("Whether to include completed tasks in the results"),
+    dateFilter: z
+      .string()
+      .optional()
+      .describe(
+        "Filter tasks by date (e.g., 'today', 'tomorrow', or 'YYYY-MM-DD')",
+      ),
+  }),
+  execute: async ({
+    includeCompleted = true,
+    dateFilter,
+  }: {
+    includeCompleted?: boolean;
+    dateFilter?: string;
+  }) => {
+    try {
+      console.log("Getting tasks with parameters:", {
+        includeCompleted,
+        dateFilter,
+      });
+
+      const user = await getCurrentUser();
+      if (!user) throw new Error("User not authenticated");
+
+      const tasks = await getTasks();
+
+      // Filter tasks based on completion status if specified
+      let filteredTasks = tasks;
+      if (!includeCompleted) {
+        filteredTasks = tasks.filter((task: Task) => !task.completed);
+      }
+
+      // Filter by date if specified
+      if (dateFilter) {
+        const targetDate = (() => {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+
+          switch (dateFilter.toLowerCase()) {
+            case "today":
+              return today;
+            case "tomorrow":
+              const tomorrow = new Date(today);
+              tomorrow.setDate(tomorrow.getDate() + 1);
+              return tomorrow;
+            default:
+              try {
+                const date = new Date(dateFilter);
+                if (!isNaN(date.getTime())) return date;
+              } catch (e) {
+                console.error("Invalid date filter:", dateFilter);
+              }
+              return null;
+          }
+        })();
+
+        if (targetDate) {
+          filteredTasks = filteredTasks.filter((task: Task) => {
+            if (!task.dueDate) return false;
+            const taskDate = new Date(task.dueDate);
+            return taskDate.toDateString() === targetDate.toDateString();
+          });
+        }
+      }
+
+      // Format tasks for response
+      const formattedTasks = filteredTasks.map((task: Task) => ({
+        id: task.id,
+        title: task.title,
+        status: task.completed ? "completed" : "active",
+        priority: task.priority,
+        dueDate: task.dueDate
+          ? new Date(task.dueDate).toLocaleDateString()
+          : null,
+        dueTime: task.dueTime || null,
+        subtasks: task.subtasks || [],
+      }));
+
+      return {
+        success: true,
+        message: `Retrieved ${formattedTasks.length} tasks`,
+        tasks: formattedTasks,
+      };
+    } catch (error: any) {
+      console.error("Error in getTasksTool:", error);
+      throw new Error(`Failed to get tasks: ${error.message}`);
     }
   },
 });

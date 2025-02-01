@@ -73,6 +73,22 @@ interface TaskItemProps {
   onDelete: (id: string) => void;
 }
 
+const parseTimeString = (timeString: string | null): Date | null => {
+  if (!timeString) return null;
+  try {
+    // Ensure the time string is in HH:mm format
+    const isValidTimeFormat = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(
+      timeString,
+    );
+    if (!isValidTimeFormat) return null;
+
+    const date = new Date(`2000/01/01 ${timeString}`);
+    return isNaN(date.getTime()) ? null : date;
+  } catch {
+    return null;
+  }
+};
+
 export function TaskItem({
   task: initialTask,
   onUpdate,
@@ -337,10 +353,12 @@ export function TaskItem({
                   {optimisticTask.dueDate &&
                     format(optimisticTask.dueDate, "d MMM,")}
                   {optimisticTask.dueTime &&
-                    format(
-                      new Date(`2000/01/01 ${optimisticTask.dueTime}`),
-                      " h:mm a",
-                    )}
+                    (() => {
+                      const parsedTime = parseTimeString(
+                        optimisticTask.dueTime,
+                      );
+                      return parsedTime ? format(parsedTime, " h:mm a") : "";
+                    })()}
                 </span>
               </span>
             )}

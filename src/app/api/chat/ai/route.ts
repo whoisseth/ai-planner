@@ -3,15 +3,16 @@ import { groq } from "@ai-sdk/groq";
 import { generateText, tool, streamText } from "ai";
 import { Message } from "ai";
 import { getCurrentUser } from "@/lib/session";
-import { createTaskTool } from "./services/taskTool";
+import { createTaskTool, getTasksTool } from "./services/taskTool";
 import {
   saveMessageWithEmbedding,
   getRelevantContext,
 } from "./services/embeddings";
 
 // Helper function to detect if message indicates task creation intent
-function isTaskCreationIntent(message: string): boolean {
-  const taskCreationKeywords = [
+function isTaskManagementIntent(message: string): boolean {
+  const taskKeywords = [
+    // Task creation keywords
     "create task",
     "add task",
     "new task",
@@ -21,12 +22,24 @@ function isTaskCreationIntent(message: string): boolean {
     "set reminder",
     "add to my list",
     "add to todo",
+    // Task viewing keywords
+    "show tasks",
+    "view tasks",
+    "list tasks",
+    "get tasks",
+    "my tasks",
+    "show my tasks",
+    "what are my tasks",
+    "pending tasks",
+    "today's tasks",
+    "tasks for today",
+    "upcoming tasks",
+    "completed tasks",
+    "all tasks",
   ];
 
   const lowercaseMessage = message.toLowerCase();
-  return taskCreationKeywords.some((keyword) =>
-    lowercaseMessage.includes(keyword),
-  );
+  return taskKeywords.some((keyword) => lowercaseMessage.includes(keyword));
 }
 
 export async function POST(req: Request) {
@@ -69,9 +82,13 @@ export async function POST(req: Request) {
         const context = await getRelevantContext(user.id, lastMessage.content);
         console.log("context- ", context);
 
-        // Check if the message indicates task creation intent
-        const shouldIncludeTaskTool = isTaskCreationIntent(lastMessage.content);
-        console.log("Task creation intent detected:", shouldIncludeTaskTool);
+        // Check if the message indicates task management intent
+        const shouldIncludeTaskTools = isTaskManagementIntent(
+          lastMessage.content,
+        );
+        // console.log("Task management intent detected:", shouldIncludeTaskTools);
+
+        // ${shouldIncludeTaskTools ? "You have access to task management capabilities - use them when appropriate." : "Guide users to explicitly request task creation or viewing when needed."}`,
 
         // Generate response using Groq with context
         const response = await generateText({
@@ -83,8 +100,9 @@ export async function POST(req: Request) {
 
                 Previous context from our conversation: ${context}
 
-                When users want to create tasks:
-                - If they explicitly ask to create a task, you can help create it directly
+                When users want to manage tasks:
+                - If they want to create a task, help them create it directly using createTaskTool
+                - If they want to view tasks, help them view tasks using getTasksTool with appropriate filters
                 - If they mention activities or todos without explicitly requesting task creation, suggest creating a task for it
                 
                 For general productivity questions:
@@ -97,15 +115,19 @@ export async function POST(req: Request) {
                 - Practical and actionable
                 - Relevant to task management and productivity
                 
-                ${shouldIncludeTaskTool ? "You have access to task creation capabilities - use them when appropriate." : "Guide users to explicitly request task creation when needed."}`,
+                   ${shouldIncludeTaskTools ? "You have access to task management capabilities - use them when appropriate." : "Guide users to explicitly request task creation or viewing when needed."},
+
+                `,
             },
             ...messages,
           ] as Message[],
-          tools: shouldIncludeTaskTool
+          tools: shouldIncludeTaskTools
             ? {
                 createTaskTool,
+                getTasksTool,
               }
             : undefined,
+          toolChoice: shouldIncludeTaskTools ? "auto" : "none",
           maxSteps: 5,
           temperature: 0.7,
         });
