@@ -2,6 +2,7 @@
  * Constants for task management and AI configuration
  */
 
+// src/api/chat/ai/constants/chatConstants.ts
 export const TASK_MANAGEMENT_KEYWORDS = {
   creation: [
     "create task",
@@ -33,9 +34,10 @@ export const TASK_MANAGEMENT_KEYWORDS = {
 };
 
 export const AI_CONFIG = {
-  model: "llama-3.3-70b-versatile",
-  maxSteps: 5,
-  temperature: 0.6,
+  // model: "llama-3.3-70b-versatile",
+  model: "gemma2-9b-it",
+  maxSteps: 8,
+  // temperature: 0.6,
 };
 
 export const SYSTEM_PROMPTS = {

@@ -7,6 +7,7 @@ import {
   deleteTask as deleteTaskDb,
   getTasksByUserId,
   getTaskById,
+  searchTaskByTitle as searchTaskByTitleDb,
 } from "@/data-access/tasks";
 import {
   createSubtask as createSubtaskDb,
@@ -17,6 +18,7 @@ import {
 import { AuthenticationError } from "@/use-cases/errors";
 import { getCurrentUser } from "@/lib/session";
 import { revalidatePath } from "next/cache";
+import { UserId } from "@/types";
 
 
 export async function createTask(
@@ -53,7 +55,7 @@ export async function updateTask(taskId: string, updateData: any) {
     const validUpdateData: any = {
       updatedAt: new Date()
     };
-    
+
     // Handle title updates - ensure it's a non-empty string
     if (updateData.title !== undefined) {
       if (typeof updateData.title !== 'string' || updateData.title.trim() === '') {
@@ -65,10 +67,10 @@ export async function updateTask(taskId: string, updateData: any) {
     // Handle priority updates
     if (updateData.priority !== undefined) {
       const validPriorities = ['Low', 'Medium', 'High', 'Urgent'];
-      const priority = typeof updateData.priority === 'string' ? 
-        updateData.priority.charAt(0).toUpperCase() + updateData.priority.slice(1).toLowerCase() : 
+      const priority = typeof updateData.priority === 'string' ?
+        updateData.priority.charAt(0).toUpperCase() + updateData.priority.slice(1).toLowerCase() :
         updateData.priority;
-      
+
       if (!validPriorities.includes(priority)) {
         throw new Error("Invalid priority value. Must be one of: Low, Medium, High, Urgent");
       }
@@ -79,7 +81,7 @@ export async function updateTask(taskId: string, updateData: any) {
     if (updateData.completed !== undefined) {
       validUpdateData.completed = Boolean(updateData.completed);
     }
-    
+
     // Handle dueDate - ensure it's a valid date or null
     if (updateData.dueDate !== undefined) {
       if (updateData.dueDate === null) {
@@ -118,7 +120,7 @@ export async function updateTask(taskId: string, updateData: any) {
     }
 
     console.log("Task updated successfully:", updatedTask);
-    
+
     // Get subtasks
     const subtasks = await getSubtasksByTaskId(taskId);
     const taskWithSubtasks = { ...updatedTask, subtasks };
@@ -224,5 +226,20 @@ export async function deleteSubtask(taskId: string, subtaskId: string) {
   } catch (error) {
     console.error("Error deleting subtask:", error);
     throw new Error("Failed to delete subtask");
+  }
+}
+
+
+// seach task by title
+export async function searchTaskByTitle(title: string) {
+  const user = await getCurrentUser();
+  if (!user) throw new AuthenticationError();
+
+  try {
+    const tasks = await searchTaskByTitleDb(user.id, title);
+    return tasks;
+  } catch (error) {
+    console.error("Error searching task by title:", error);
+    throw new Error("Failed to search task by title");
   }
 }

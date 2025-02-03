@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createTask, getTasks } from "@/app/actions/tasks";
+import { createTask, getTasks, deleteTask, searchTaskByTitle, updateTask } from "@/app/actions/tasks";
 import { getCurrentUser } from "@/lib/session";
 import { tool } from "ai";
 import { Task } from "@/components/TaskItem";
@@ -192,3 +192,146 @@ export const getTasksTool = tool({
     }
   },
 });
+
+// Add this new tool after the existing tools
+export const deleteTaskTool = tool({
+  type: "function",
+  description: "Delete a task by searching for its title first and then deleting by ID",
+  parameters: z.object({
+    title: z.string().describe("The title of the task to delete"),
+  }),
+  execute: async ({ title }: { title: string }) => {
+    try {
+      // First search for the task by title
+      const searchResult = await searchTaskByTitle(title);
+      
+      if (!searchResult || searchResult.length === 0) {
+        throw new Error(`No task found with title similar to "${title}"`);
+      }
+
+      // Use the first matching task's ID
+      const taskToDelete = searchResult[0];
+      const result = await deleteTask(taskToDelete.id);
+      
+      return {
+        success: true,
+        message: `Successfully deleted task: ${taskToDelete.title}`
+      };
+    } catch (error: any) {
+      console.error("Error in deleteTaskTool:", error);
+      throw new Error(`Failed to delete task: ${error.message}`);
+    }
+  },
+});
+
+// search task by title
+export const searchTaskByTitleTool = tool({
+  type: "function",
+  description: "Search for tasks by title",
+  parameters: z.object({
+    title: z.string().describe("The title of the task to search for"),
+  }),
+  execute: async ({ title }: { title: string }) => {
+    const user = await getCurrentUser();
+    if (!user) throw new Error("User not authenticated");
+    const tasks = await searchTaskByTitle(title);
+    return tasks;
+  },
+});
+
+// Add this new tool before the final export
+export const updateTaskTool = tool({
+  type: "function",
+  description: "Update an existing task's details",
+  parameters: z.object({
+    taskId: z.string().describe("The ID of the task to update"),
+    title: z.string().optional().describe("The new title of the task"),
+    priority: z
+      .enum(["Low", "Medium", "High", "Urgent"])
+      .optional()
+      .describe("New priority level of the task"),
+    dueDate: z
+      .string()
+      .optional()
+      .describe("New due date for the task in YYYY-MM-DD format"),
+    dueTime: z
+      .string()
+      .optional()
+      .describe("New due time for the task in HH:mm format"),
+    completed: z
+      .boolean()
+      .optional()
+      .describe("New completion status of the task"),
+  }),
+  execute: async ({
+    taskId,
+    title,
+    priority,
+    dueDate,
+    dueTime,
+    completed,
+  }: {
+    taskId: string;
+    title?: string;
+    priority?: "Low" | "Medium" | "High" | "Urgent";
+    dueDate?: string;
+    dueTime?: string;
+    completed?: boolean;
+  }) => {
+    try {
+      console.log("Updating task with parameters:", {
+        taskId,
+        title,
+        priority,
+        dueDate,
+        dueTime,
+        completed,
+      });
+
+      const user = await getCurrentUser();
+      if (!user) throw new Error("User not authenticated");
+
+      // Parse the date if provided
+      let parsedDate: Date | undefined;
+      if (dueDate) {
+        try {
+          parsedDate = new Date(dueDate);
+          if (isNaN(parsedDate.getTime())) {
+            throw new Error("Invalid date format");
+          }
+        } catch (error) {
+          throw new Error("Invalid date format");
+        }
+      }
+
+      const updateData = {
+        id: taskId,
+        title,
+        priority,
+        dueDate: parsedDate,
+        dueTime,
+        completed,
+        userId: user.id,
+      };
+
+      // Remove undefined values
+      (Object.keys(updateData) as Array<keyof typeof updateData>).forEach(
+        (key) => updateData[key] === undefined && delete updateData[key]
+      );
+
+      const updatedTask = await updateTask(taskId, updateData);
+      revalidatePath("/");
+
+      return {
+        success: true,
+        message: `Task updated successfully`,
+        task: updatedTask,
+      };
+    } catch (error: any) {
+      console.error("Error in updateTaskTool:", error);
+      throw new Error(`Failed to update task: ${error.message}`);
+    }
+  },
+});
+
+

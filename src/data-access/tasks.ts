@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { tasks } from "@/db/schema";
 import { UserId } from "@/use-cases/types";
-import { eq, and } from "drizzle-orm";
+import { eq, and, ilike, sql } from "drizzle-orm";
 import { Task } from "@/db/schema";
 
 export async function createTask(
@@ -71,3 +71,18 @@ export async function getTaskById(userId: UserId, taskId: string) {
     .limit(1);
   return task[0];
 }
+
+
+// search task by title
+export async function searchTaskByTitle(userId: number, searchTerm: string) {
+  return await db
+    .select()
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.userId, userId),
+        sql`lower(${tasks.title}) LIKE lower(${'%' + searchTerm + '%'})`
+      )
+    );
+}
+

@@ -1,44 +1,68 @@
+// src/app/api/chat/ai/services/chatHandler.ts
 import { groq } from "@ai-sdk/groq";
-import { generateText, Message } from "ai";
+import { generateText, Message, streamText } from "ai";
 import { createStreamHandlers } from "./streamService";
 import { isTaskManagementIntent } from "../utils/intentDetection";
-import { createTaskTool, getTasksTool } from "./taskTool";
+import { createTaskTool, deleteTaskTool, getTasksTool, searchTaskByTitleTool, updateTaskTool } from "./taskTool";
 import { saveMessageWithEmbedding, getRelevantContext } from "./embeddings";
-import { AI_CONFIG, SYSTEM_PROMPTS } from "../constants/chatConstants";
+import { SYSTEM_PROMPTS } from "../constants/chatConstants";
 
 /**
  * Generates an AI response using the configured model
  */
-async function generateAIResponse(
+
+// ${shouldIncludeTaskTools
+//   ? "You have access to task management capabilities - use them when appropriate."
+//   : "Guide users to explicitly request task creation, viewing, updating, or deleting when needed."
+// }`,
+
+
+
+// Follow these steps for every user message:
+// 1. First, analyze if the user's request involves any task operations (create, read, update, delete, search)
+// 2. If yes, use the appropriate tool from the available tools above
+// 3. If no task operation is requested, provide helpful guidance and suggestions based on the conversation context
+
+
+async function generateAIResponseWithAi(
   messages: Message[],
   context: string,
-  shouldIncludeTaskTools: boolean
+  // shouldIncludeTaskTools: boolean
 ) {
   return generateText({
-    model: groq(AI_CONFIG.model),
+    model: groq('gemma2-9b-it'),
     messages: [
       {
         role: "system",
-        content: `${SYSTEM_PROMPTS.base} & ${SYSTEM_PROMPTS.responseStyle}
+        content: `
+        You are a task management assistant with access to the following tools:
+        - createTaskTool: Create new tasks
+        - getTasksTool: View and list tasks
+        - deleteTaskTool: Delete existing tasks 
+        - searchTaskByTitleTool: Search for tasks by title
+        - updateTaskTool: Update existing task details
+
+        ${SYSTEM_PROMPTS.base} & ${SYSTEM_PROMPTS.responseStyle}
         Previous context from our conversation: ${context}
-        ${
-          shouldIncludeTaskTools
-            ? "You have access to task management capabilities - use them when appropriate."
-            : "Guide users to explicitly request task creation or viewing when needed."
-        }`,
+
+
+        Always maintain a professional but friendly tone, focusing on helping users be more productive and organized with their tasks.`
       },
       ...messages,
     ] as Message[],
-    tools: shouldIncludeTaskTools
-      ? {
-          createTaskTool,
-          getTasksTool,
-        }
-      : undefined,
-    toolChoice: shouldIncludeTaskTools ? "auto" : "none",
-    maxSteps: AI_CONFIG.maxSteps,
-    temperature: AI_CONFIG.temperature,
-  });
+    tools:
+    {
+      createTaskTool,
+      getTasksTool,
+      deleteTaskTool,
+      searchTaskByTitleTool,
+      updateTaskTool,
+    },
+    toolChoice: "auto",
+    maxSteps: 5,
+    // temperature: AI_CONFIG.temperature,
+  }
+  );
 }
 
 /**
@@ -56,55 +80,35 @@ async function processResponse(
 
     // Get relevant context
     const context = await getRelevantContext(userId, lastMessageContent);
-    console.log("Retrieved context:", context);
+    console.log("Retrieved context from pinecone db:", `----Start
+       ${context}
+       ----End
+       `);
 
-    // Check task management intent
-    const shouldIncludeTaskTools = isTaskManagementIntent(lastMessageContent);
 
     // Generate response
-    const response = await generateAIResponse(
+    const response = await generateAIResponseWithAi(
       messages,
       context,
-      shouldIncludeTaskTools
+      // lastMessageContent
     );
-
-    // Check if a task was created and get the task title
-    let taskTitle = "";
-    const hasTaskCreation = response.toolCalls?.some((call: any) => {
-      if (call.toolName === 'createTaskTool' || call.type === 'tool-call') {
-        try {
-          const args = typeof call.args === 'string' ? JSON.parse(call.args) : call.args;
-          taskTitle = args.title || "";
-          return true;
-        } catch (e) {
-          return true;
-        }
-      }
-      return false;
-    });
-
+    console.log(`---start_response.toolCalls-> ${response.steps} <-end`)
+    // console.log(` ---response.reasoning_start ${response.reasoning} --- end_response.reasoning  `)
     // Save assistant response
     await saveMessageWithEmbedding(userId, response.text, "assistant");
+    // return response.text
+    // await streamHandlers.sendMessage(response.text, true);
+    // await streamHandlers.close();
 
-    if (hasTaskCreation) {
-      // For task creation, only send a simple success message with the task name
-      await streamHandlers.sendMessage(JSON.stringify({
-        type: 'task_created',
-        isComplete: true,
-        content: `✅ Task "${taskTitle}" has been created successfully!`
-      }), true);
-    } else {
-      // For non-task responses, send the text directly
-      await streamHandlers.sendMessage(response.text, true);
+    for await (const textPart of response.text) {
+      console.log(textPart);
     }
-    
-    await streamHandlers.close();
+
   } catch (error) {
     console.error("Error generating response:", error);
-    const errorMessage =
-      error instanceof Error
-        ? `Failed to generate response: ${error.message}`
-        : "Failed to generate response";
+    const errorMessage = error instanceof Error
+      ? `Sorry, I encountered an error: ${error.message}`
+      : "Sorry, I encountered an error while processing your request";
     await streamHandlers.sendMessage(errorMessage, true);
     await streamHandlers.close();
   }
@@ -118,7 +122,7 @@ export async function handleChatRequest(
   messages: Message[]
 ): Promise<Response> {
   const streamHandlers = createStreamHandlers();
-  
+
   if (!Array.isArray(messages) || messages.length === 0) {
     return new Response(
       JSON.stringify({ error: "Invalid or empty messages array" }),
@@ -132,7 +136,7 @@ export async function handleChatRequest(
   const lastMessage = messages[messages.length - 1];
 
   try {
-    console.log("Processing chat request. Last message:", lastMessage.content);
+    console.log("Last message:", lastMessage.content);
 
     // Process in background
     processResponse(userId, messages, lastMessage.content, streamHandlers);
