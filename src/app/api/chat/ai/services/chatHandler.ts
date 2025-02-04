@@ -97,8 +97,8 @@ async function processResponse(
     // Save assistant response
     await saveMessageWithEmbedding(userId, response.text, "assistant");
     // return response.text
-    // await streamHandlers.sendMessage(response.text, true);
-    // await streamHandlers.close();
+    await streamHandlers.sendMessage(response.text, true);
+    await streamHandlers.close();
 
     for await (const textPart of response.text) {
       console.log(textPart);
