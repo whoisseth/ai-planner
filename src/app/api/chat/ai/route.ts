@@ -28,33 +28,37 @@ export async function POST(req: Request) {
     const lastMessage = messages[messages.length - 1];
 
     // Get relevant context
-    const context = await getRelevantContext(user.id, lastMessage.content);
-    console.log("Retrieved context from pinecone db:", `----Start ${context} ----End`);
+    // TODO: Uncomment this when we have a vector db
+    // const context = await getRelevantContext(user.id, lastMessage.content);
+    const context = "";
 
-
+    console.log("messages : ", messages);
 
     // Create streaming response
     return createDataStreamResponse({
       execute: async (dataStream) => {
         const result = streamText({
           model: groq('gemma2-9b-it'),
-          messages: [
-            {
-              role: "system",
-              content: `
-                  You are a task management assistant with access to the following tools:
+          system: `You are a task management assistant with access to the following tools:
                   - createTaskTool: Create new tasks
                   - getTasksTool: View and list tasks
                   - deleteTaskTool: Delete existing tasks 
                   - searchTaskByTitleTool: Search for tasks by title
                   - updateTaskTool: Update existing task details
-
-                  ${SYSTEM_PROMPTS.base} & ${SYSTEM_PROMPTS.responseStyle}
-                  Previous context from our conversation: ${context}
                   
-                  Always maintain a professional but friendly tone, focusing on helping users be more productive and organized with their tasks.`
-            },
-            ...messages
+                  Previous context from our conversation that came from vector db : start of context ${context} : end of context
+
+                  Always analyze whether to use the tools or not.
+                  If the tools are needed, use them.
+                  If the tools are not needed, do not use them.
+                  Always maintain a professional but friendly tone, focusing on helping users be more productive and organized with their tasks.`,
+          messages,
+          experimental_activeTools: [
+            'createTaskTool',
+            'getTasksTool',
+            'deleteTaskTool',
+            'searchTaskByTitleTool',
+            'updateTaskTool',
           ],
           tools: {
             createTaskTool,
@@ -63,7 +67,7 @@ export async function POST(req: Request) {
             searchTaskByTitleTool,
             updateTaskTool,
           },
-          toolChoice: "auto",
+          // toolChoice: "auto",
           maxSteps: 10,
           experimental_transform: smoothStream({ chunking: 'word' }),
           onFinish: async (result) => {

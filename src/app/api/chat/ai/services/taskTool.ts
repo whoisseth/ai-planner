@@ -204,7 +204,7 @@ export const deleteTaskTool = tool({
     try {
       // First search for the task by title
       const searchResult = await searchTaskByTitle(title);
-      
+
       if (!searchResult || searchResult.length === 0) {
         throw new Error(`No task found with title similar to "${title}"`);
       }
@@ -212,7 +212,7 @@ export const deleteTaskTool = tool({
       // Use the first matching task's ID
       const taskToDelete = searchResult[0];
       const result = await deleteTask(taskToDelete.id);
-      
+
       return {
         success: true,
         message: `Successfully deleted task: ${taskToDelete.title}`

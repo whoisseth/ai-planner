@@ -43,18 +43,19 @@ export async function saveMessageWithEmbedding(
     .returning();
 
   // Save embedding to Pinecone
-  await pineconeIndex.upsert([
-    {
-      id: message.id.toString(),
-      values: embedding,
-      metadata: {
-        userId: userId.toString(),
-        content,
-        role,
-        timestamp: new Date().toISOString(),
-      },
-    },
-  ]);
+  // TODO: Uncomment this when we have a vector db
+  // await pineconeIndex.upsert([
+  //   {
+  //     id: message.id.toString(),
+  //     values: embedding,
+  //     metadata: {
+  //       userId: userId.toString(),
+  //       content,
+  //       role,
+  //       timestamp: new Date().toISOString(),
+  //     },
+  //   },
+  // ]);
 
   return message;
 }
