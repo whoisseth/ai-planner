@@ -89,3 +89,20 @@
     @apply text-foreground;
   }
 }
+
+@keyframes wave {
+  0% {
+    transform: scaleY(0.2);
+  }
+  50% {
+    transform: scaleY(calc(0.2 + var(--wave-intensity, 0.8)));
+  }
+  100% {
+    transform: scaleY(0.2);
+  }
+}
+
+.animate-wave {
+  transform-origin: bottom;
+  animation: wave 1s ease-in-out infinite;
+}

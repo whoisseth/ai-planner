@@ -81,7 +81,7 @@ export default async function RootLayout({
         <Analytics />
         <TailwindIndicator />
         <Toaster />
-        <SonnerToaster />
+        <SonnerToaster position="top-center" />
       </body>
     </html>
   );

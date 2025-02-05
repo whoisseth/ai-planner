@@ -1,8 +1,7 @@
 import { getCurrentUser } from "@/lib/session";
 import { db } from "@/db";
 import { chatMessages } from "@/db/schema";
-import { desc, asc, lt, and, eq, sql } from "drizzle-orm";
-import { SQL } from "drizzle-orm";
+import { desc, and, eq, lt } from "drizzle-orm";
 
 export async function GET(request: Request) {
   try {
@@ -13,7 +12,7 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const cursor = searchParams.get('cursor');
-    const limit = 7;
+    const limit = 15; // Increased limit for better UX
 
     const baseConditions = [eq(chatMessages.userId, user.id)];
     if (cursor) {
@@ -23,19 +22,21 @@ export async function GET(request: Request) {
     const messages = await db.query.chatMessages.findMany({
       where: and(...baseConditions),
       orderBy: [desc(chatMessages.createdAt)],
-      limit: limit + 1,
+      limit: limit + 1, // Fetch one extra to determine if there are more
     });
 
     const hasMore = messages.length > limit;
     const messagesToReturn = hasMore ? messages.slice(0, limit) : messages;
     
-    // For cursor-based pagination, we need the oldest message's timestamp
-    const oldestMessage = messagesToReturn[messagesToReturn.length - 1];
-    const nextCursor = hasMore ? oldestMessage?.createdAt?.toISOString() : null;
+    // Get the cursor for the next page
+    const nextCursor = hasMore && messagesToReturn.length > 0
+      ? messagesToReturn[messagesToReturn.length - 1].createdAt?.toISOString()
+      : null;
 
     return new Response(
       JSON.stringify({
         messages: messagesToReturn.map(msg => ({
+          id: msg.id.toString(),
           role: msg.role,
           content: msg.content,
           createdAt: msg.createdAt?.toISOString(),

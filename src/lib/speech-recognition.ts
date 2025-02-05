@@ -57,6 +57,7 @@ export class SpeechRecognitionService {
   private currentTranscript = '';
   private isFinalResult = false;
   private isRecordingStopped = false;
+  private isRecognitionActive = false;
 
   async initialize() {
     try {
@@ -65,48 +66,70 @@ export class SpeechRecognitionService {
       // Check for browser support
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRecognition) {
-        console.error('Speech Recognition API not supported in this browser');
-        return false;
+        throw new Error('Speech Recognition API not supported in this browser');
       }
+
+      // Initialize recognition first
+      this.recognition = new SpeechRecognition();
+      this.recognition.continuous = true;  // Enable continuous recognition
+      this.recognition.interimResults = true;  // Get interim results
+      this.recognition.lang = 'en-US';
 
       // Check for microphone permissions
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         stream.getTracks().forEach(track => track.stop()); // Clean up test stream
-      } catch (err) {
-        console.error('Microphone permission denied:', err);
-        return false;
+      } catch (err: any) {
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          throw new Error('Microphone access was denied. Please allow microphone access to use voice input.');
+        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+          throw new Error('No microphone found. Please connect a microphone to use voice input.');
+        } else {
+          throw new Error('Failed to access microphone: ' + (err.message || 'Unknown error'));
+        }
       }
-
-      this.recognition = new SpeechRecognition();
-      this.recognition.continuous = true;  // Enable continuous recognition
-      this.recognition.interimResults = true;  // Get interim results
-      this.recognition.lang = 'en-US';
       
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error initializing speech recognition:', error);
-      return false;
+      throw error; // Re-throw to handle in the UI
     }
   }
 
   async startRecording(
     onVisualizationData: (data: number[]) => void,
-    onTranscription: (text: string) => void
+    onTranscription: (text: string) => void,
+    onError?: (error: Error) => void
   ) {
     try {
       if (!this.recognition) {
         throw new Error('Speech recognition not initialized');
       }
 
+      // Check if recognition is already active
+      if (this.isRecognitionActive) {
+        return true;
+      }
+
       // Reset state
       this.currentTranscript = '';
       this.isFinalResult = false;
       this.isRecordingStopped = false;
+      this.isRecognitionActive = true;
 
       // Set up audio visualization
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      this.mediaStream = stream;
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        this.mediaStream = stream;
+      } catch (err: any) {
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          throw new Error('Microphone access was denied. Please allow microphone access to use voice input.');
+        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+          throw new Error('No microphone found. Please connect a microphone to use voice input.');
+        } else {
+          throw new Error('Failed to access microphone: ' + (err.message || 'Unknown error'));
+        }
+      }
 
       this.audioContext = new AudioContext();
       this.analyser = this.audioContext.createAnalyser();
@@ -115,7 +138,7 @@ export class SpeechRecognitionService {
       this.analyser.minDecibels = -85;
       this.analyser.maxDecibels = -10;
 
-      const source = this.audioContext.createMediaStreamSource(stream);
+      const source = this.audioContext.createMediaStreamSource(this.mediaStream!);
       source.connect(this.analyser);
 
       // Start audio visualization
@@ -168,19 +191,45 @@ export class SpeechRecognitionService {
       };
 
       this.recognition.onend = () => {
+        this.isRecognitionActive = false;
         // Only restart if we still have an active media stream and haven't explicitly stopped
         if (this.mediaStream && !this.isRecordingStopped) {
           setTimeout(() => {
-            this.recognition?.start();
+            if (!this.isRecordingStopped) {
+              this.recognition?.start();
+              this.isRecognitionActive = true;
+            }
           }, 100);
         }
       };
 
       this.recognition.onerror = (event: SpeechRecognitionEvent) => {
-        // Only log errors that aren't no-speech or aborted
-        if (event.error !== 'no-speech' && event.error !== 'aborted') {
-          console.error('Speech recognition error:', event.error);
-          this.stopRecording();
+        // Handle specific error types
+        let errorMessage: string;
+        switch (event.error) {
+          case 'audio-capture':
+            errorMessage = 'No microphone was found or microphone access was denied. Please check your microphone settings.';
+            break;
+          case 'not-allowed':
+            errorMessage = 'Microphone access was denied. Please allow microphone access to use voice input.';
+            break;
+          case 'network':
+            errorMessage = 'Network error occurred. Please check your internet connection.';
+            break;
+          case 'no-speech':
+            // Ignore no-speech errors as they're common
+            return;
+          case 'aborted':
+            // Ignore aborted errors as they happen when we stop recording
+            return;
+          default:
+            errorMessage = `Speech recognition error: ${event.error}`;
+        }
+        
+        console.error(errorMessage);
+        this.stopRecording();
+        if (onError) {
+          onError(new Error(errorMessage));
         }
       };
 
@@ -188,13 +237,18 @@ export class SpeechRecognitionService {
       this.recognition.start();
       return true;
     } catch (error) {
+      this.isRecognitionActive = false;
       console.error('Error starting recording:', error);
+      if (onError) {
+        onError(error instanceof Error ? error : new Error('Failed to start recording'));
+      }
       return false;
     }
   }
 
   stopRecording() {
     this.isRecordingStopped = true;
+    this.isRecognitionActive = false;
 
     if (this.recognition) {
       try {
