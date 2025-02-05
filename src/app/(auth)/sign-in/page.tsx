@@ -3,7 +3,6 @@
 import * as React from "react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { btnStyles } from "@/styles/icons";
 import { Mail } from "lucide-react";
 import Link from "next/link";
 import { MagicLinkForm } from "./magic-link-form";
@@ -69,7 +68,7 @@ export default function SignInPage() {
           </div>
 
           <div className="flex justify-center">
-            <Button asChild variant="ghost" className={cn(btnStyles, "w-full")}>
+            <Button asChild variant="ghost" className={cn('flex gap-2 items-center', "w-full")}>
               <Link href="/sign-in/email">
                 <Mail /> Sign in with Email
               </Link>
