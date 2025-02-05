@@ -31,8 +31,7 @@ export async function POST(req: Request) {
     const context = await getRelevantContext(user.id, lastMessage.content);
     console.log("Retrieved context from pinecone db:", `----Start ${context} ----End`);
 
-    // Save user message with embedding
-    await saveMessageWithEmbedding(user.id, lastMessage.content, "user");
+
 
     // Create streaming response
     return createDataStreamResponse({
@@ -65,11 +64,13 @@ export async function POST(req: Request) {
             updateTaskTool,
           },
           toolChoice: "auto",
-          maxSteps: 5,
+          maxSteps: 10,
           experimental_transform: smoothStream({ chunking: 'word' }),
           onFinish: async (result) => {
-            // Save the complete response
             if (result.text) {
+              // Save user message with embedding
+              await saveMessageWithEmbedding(user.id, lastMessage.content, "user");
+              // Save the complete response
               await saveMessageWithEmbedding(user.id, result.text, "assistant");
             }
           }
