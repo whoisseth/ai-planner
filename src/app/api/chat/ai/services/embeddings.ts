@@ -78,4 +78,4 @@ export async function getRelevantContext(userId: number, query: string) {
     .map((match) => match.metadata?.content)
     .filter(Boolean)
     .join("\n");
-} 
+}

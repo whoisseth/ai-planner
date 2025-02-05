@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { createTask, getTasks, deleteTask, searchTaskByTitle, updateTask } from "@/app/actions/tasks";
+import {
+  createTask,
+  getTasks,
+  deleteTask,
+  searchTaskByTitle,
+  updateTask,
+} from "@/app/actions/tasks";
 import { getCurrentUser } from "@/lib/session";
 import { tool } from "ai";
 import { Task } from "@/components/TaskItem";
@@ -7,25 +13,51 @@ import { revalidatePath } from "next/cache";
 
 // Helper functions for date and time formatting
 const formatDate = (date: Date): string => {
-  return date.toLocaleDateString('en-US', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric'
+  return date.toLocaleDateString("en-US", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
   });
 };
 
 const formatTime = (date: Date): string => {
-  return date.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true
+  return date.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
   });
+};
+
+// Helper function to convert 12-hour time to 24-hour format
+const convertTo24HourFormat = (time: string): string => {
+  // Handle empty or invalid input
+  if (!time) return "";
+
+  try {
+    // Parse time components
+    const [timePart, meridiem] = time.toUpperCase().split(" ");
+    let [hours, minutes] = timePart.split(":").map((num) => parseInt(num));
+
+    // Convert to 24-hour format
+    if (meridiem === "PM" && hours !== 12) {
+      hours += 12;
+    } else if (meridiem === "AM" && hours === 12) {
+      hours = 0;
+    }
+
+    // Format as HH:mm
+    return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+  } catch (error) {
+    console.error("Error converting time format:", error);
+    return "";
+  }
 };
 
 // Define the task creation tool
 export const createTaskTool = tool({
   type: "function",
-  description: "Creates and schedules new tasks with customizable title, priority, due date, and time while supporting reminders and task organization.",
+  description:
+    "Creates and schedules new tasks with customizable title, priority, due date, and time while supporting reminders and task organization.",
   parameters: z.object({
     title: z.string().describe("The title of the task"),
     priority: z
@@ -110,8 +142,8 @@ export const createTaskTool = tool({
           priority: task.priority,
           dueDate: formatDate(parsedDate),
           dueTime: task.dueTime,
-          completed: task.completed
-        }
+          completed: task.completed,
+        },
       };
 
       return formattedResponse;
@@ -119,7 +151,7 @@ export const createTaskTool = tool({
       console.error("Error in createTaskTool:", error);
       return {
         success: false,
-        error: `Failed to create task: ${error.message}`
+        error: `Failed to create task: ${error.message}`,
       };
     }
   },
@@ -128,7 +160,8 @@ export const createTaskTool = tool({
 //  Define the to Get the task  tool
 export const getTasksTool = tool({
   type: "function",
-  description: "Retrieves and filters tasks based on completion status and date filters, supporting various timeframes like today, tomorrow, or specific dates.",
+  description:
+    "Returns tasks based on user's request - can show all tasks or filter by specific conditions like showing only today's tasks, tomorrow's tasks, or tasks for a specific date. Also supports filtering by completion status.",
   parameters: z.object({
     includeCompleted: z
       .boolean()
@@ -138,7 +171,7 @@ export const getTasksTool = tool({
       .string()
       .optional()
       .describe(
-        "Filter tasks by date (e.g., 'today', 'tomorrow', or specific date like '5 Feb 2025')",
+        "Filter tasks by date - use 'all' to show all tasks, 'today' for today's tasks, 'tomorrow' for tomorrow's tasks, or specify a date like '5 Feb 2025' to see tasks for that date",
       ),
   }),
   execute: async ({
@@ -149,7 +182,7 @@ export const getTasksTool = tool({
     dateFilter?: string;
   }) => {
     try {
-      console.log("Getting tasks with parameters:", {
+      console.log("Running getTask tool with parameters:", {
         includeCompleted,
         dateFilter,
       });
@@ -217,7 +250,7 @@ export const getTasksTool = tool({
       console.error("Error in getTasksTool:", error);
       return {
         success: false,
-        error: `Failed to get tasks: ${error.message}`
+        error: `Failed to get tasks: ${error.message}`,
       };
     }
   },
@@ -226,13 +259,15 @@ export const getTasksTool = tool({
 // Add this new tool after the existing tools
 export const deleteTaskTool = tool({
   type: "function",
-  description: "Removes tasks from the task list using intelligent title-based search to find and delete the most relevant matching task.",
+  description:
+    "Removes tasks from the task list using intelligent title-based search to find and delete the most relevant matching task.",
   parameters: z.object({
     title: z.string().describe("The title of the task to delete"),
   }),
   execute: async ({ title }: { title: string }) => {
     try {
-      // First search for the task by title
+      // First search for the task by title\
+      console.log("Deleting task with title:", title);
       const searchResult = await searchTaskByTitle(title);
 
       if (!searchResult || searchResult.length === 0) {
@@ -242,10 +277,10 @@ export const deleteTaskTool = tool({
       // Use the first matching task's ID
       const taskToDelete = searchResult[0];
       const result = await deleteTask(taskToDelete.id);
-
+      revalidatePath("/");
       return {
         success: true,
-        message: `Successfully deleted task: ${taskToDelete.title}`
+        message: `Successfully deleted task: ${taskToDelete.title}`,
       };
     } catch (error: any) {
       console.error("Error in deleteTaskTool:", error);
@@ -257,11 +292,13 @@ export const deleteTaskTool = tool({
 // search task by title
 export const searchTaskByTitleTool = tool({
   type: "function",
-  description: "Searches for tasks using fuzzy matching on titles to find exact or similar matches within the user's task list.",
+  description:
+    "Searches for tasks using fuzzy matching on titles to find exact or similar matches within the user's task list.",
   parameters: z.object({
     title: z.string().describe("The title of the task to search for"),
   }),
   execute: async ({ title }: { title: string }) => {
+    console.log("Searching for task with title:", title);
     const user = await getCurrentUser();
     if (!user) throw new Error("User not authenticated");
     const tasks = await searchTaskByTitle(title);
@@ -272,7 +309,8 @@ export const searchTaskByTitleTool = tool({
 // Add this new tool before the final export
 export const updateTaskTool = tool({
   type: "function",
-  description: "Modifies existing tasks by updating any combination of title, priority, due date, time, or completion status while preserving unchanged fields.",
+  description:
+    "Modifies existing tasks by updating any combination of title, priority, due date, time, or completion status while preserving unchanged fields.",
   parameters: z.object({
     taskId: z.string().describe("The ID of the task to update"),
     title: z.string().optional().describe("The new title of the task"),
@@ -288,10 +326,7 @@ export const updateTaskTool = tool({
       .string()
       .optional()
       .describe("New due time for the task in HH:mm format"),
-    completed: z
-      .boolean()
-      .optional()
-      .describe("New completion status of the task"),
+    completed: z.boolean().optional().describe("Whether the task is completed"),
   }),
   execute: async ({
     taskId,
@@ -334,34 +369,84 @@ export const updateTaskTool = tool({
         }
       }
 
-      const updateData = {
-        id: taskId,
+      const updateData: {
+        title?: string;
+        priority?: "Low" | "Medium" | "High" | "Urgent";
+        dueDate?: Date;
+        dueTime?: string;
+        completed?: boolean;
+      } = {
         title,
         priority,
         dueDate: parsedDate,
-        dueTime,
         completed,
-        userId: user.id,
       };
+
+      if (dueTime) {
+        const formattedTime = convertTo24HourFormat(dueTime);
+        if (formattedTime) {
+          updateData.dueTime = formattedTime;
+        } else {
+          throw new Error(
+            "Invalid time format. Please provide time in '1:30 PM' or '13:30' format",
+          );
+        }
+      }
 
       // Remove undefined values
       (Object.keys(updateData) as Array<keyof typeof updateData>).forEach(
-        (key) => updateData[key] === undefined && delete updateData[key]
+        (key) => {
+          if (updateData[key] === undefined) {
+            delete updateData[key];
+          }
+        },
       );
+
+      // Only proceed if we have data to update
+      if (Object.keys(updateData).length === 0) {
+        return {
+          success: false,
+          error: "No valid fields to update",
+        };
+      }
 
       const updatedTask = await updateTask(taskId, updateData);
       revalidatePath("/");
 
+      // Format the response
+      const formattedTask = {
+        id: updatedTask.id,
+        title: updatedTask.title,
+        priority: updatedTask.priority,
+        dueDate: updatedTask.dueDate
+          ? formatDate(new Date(updatedTask.dueDate))
+          : null,
+        dueTime: updatedTask.dueTime,
+        completed: updatedTask.completed,
+        subtasks: updatedTask.subtasks,
+      };
+
+      console.log("Updated task:", formattedTask);
+
       return {
         success: true,
-        message: `Task updated successfully`,
-        task: updatedTask,
+        message: "Task updated successfully",
+        task: formattedTask,
       };
     } catch (error: any) {
       console.error("Error in updateTaskTool:", error);
-      throw new Error(`Failed to update task: ${error.message}`);
+      return {
+        success: false,
+        error: error.message || "Failed to update task",
+      };
     }
   },
 });
 
-
+// export const allTools = {
+//   createTaskTool,
+//   getTasksTool,
+//   deleteTaskTool,
+//   searchTaskByTitleTool,
+//   updateTaskTool,
+// };

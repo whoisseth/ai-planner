@@ -52,9 +52,16 @@ export function AIChatbox() {
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [hasLoadedInitialMessages, setHasLoadedInitialMessages] = useState(false);
+  const [hasLoadedInitialMessages, setHasLoadedInitialMessages] =
+    useState(false);
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const [isToolVisible, setIsToolVisible] = useState(false);
+
+  // Reset tool status
+  const resetToolStatus = useCallback(() => {
+    setIsToolVisible(false);
+    setActiveTool(null);
+  }, []);
 
   // Chat and voice recognition hooks
   const {
@@ -69,11 +76,12 @@ export function AIChatbox() {
   } = useChat({
     api: "/api/chat/ai",
     initialMessages: initialMessages,
+
     onResponse: (response) => {
       if (response.ok) {
         router.refresh();
       } else {
-        console.error('Error in chat response:', response.statusText);
+        console.error("Error in chat response:", response.statusText);
       }
     },
     onFinish: () => {
@@ -82,11 +90,15 @@ export function AIChatbox() {
       setActiveTool(null);
     },
     onError: (error) => {
-      console.error('Chat error:', error);
+      console.error("Chat error:", error);
       toast.error("An error occurred while generating the response");
       setIsToolVisible(false);
       setActiveTool(null);
     },
+    onToolCall: (toolCall) => {
+      console.log("Tool call:", toolCall);
+    },
+
     body: {
       userId: 1,
     },
@@ -100,12 +112,14 @@ export function AIChatbox() {
     async function loadInitialMessages() {
       if (!hasLoadedInitialMessages) {
         try {
-          const response = await fetch('/api/chat/history');
+          const response = await fetch("/api/chat/history");
           if (response.ok) {
             const data = await response.json();
             if (data.messages) {
               const sortedMessages = [...data.messages].sort(
-                (a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
+                (a, b) =>
+                  new Date(a.createdAt || 0).getTime() -
+                  new Date(b.createdAt || 0).getTime(),
               );
               setInitialMessages(sortedMessages);
               setMessages(sortedMessages);
@@ -115,7 +129,7 @@ export function AIChatbox() {
             }
           }
         } catch (error) {
-          console.error('Failed to load initial messages:', error);
+          console.error("Failed to load initial messages:", error);
         }
       }
     }
@@ -126,12 +140,14 @@ export function AIChatbox() {
   // Handle chat box open state
   useEffect(() => {
     if (isOpen) {
-      const messagesContainer = chatBoxRef.current?.querySelector('.relative.flex-1') as HTMLDivElement;
+      const messagesContainer = chatBoxRef.current?.querySelector(
+        ".relative.flex-1",
+      ) as HTMLDivElement;
       if (messagesContainer) {
-        messagesContainer.style.scrollBehavior = 'auto';
+        messagesContainer.style.scrollBehavior = "auto";
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
         requestAnimationFrame(() => {
-          messagesContainer.style.scrollBehavior = 'smooth';
+          messagesContainer.style.scrollBehavior = "smooth";
         });
       }
     } else {
@@ -140,133 +156,122 @@ export function AIChatbox() {
   }, [isOpen, setInput, chatBoxRef]);
 
   // Handle chat scroll and message loading
-  const handleChatScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    const target = e.target as HTMLDivElement;
-    const scrollTop = target.scrollTop;
+  const handleChatScroll = useCallback(
+    (e: React.UIEvent<HTMLDivElement>) => {
+      const target = e.target as HTMLDivElement;
+      const scrollTop = target.scrollTop;
 
-    handleScroll(e, hasMore, isLoadingMore, false, () => {
-      if (scrollTop < 100 && !isLoadingMore && hasMore) {
-        setIsLoadingMore(true);
-        fetch(`/api/chat/history${cursor ? `?cursor=${cursor}` : ''}`)
-          .then(async (response) => {
-            if (response.ok) {
-              const data = await response.json();
-              if (data.messages && data.messages.length > 0) {
-                const sortedMessages = [...data.messages].sort(
-                  (a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
-                );
+      handleScroll(e, hasMore, isLoadingMore, false, () => {
+        if (scrollTop < 100 && !isLoadingMore && hasMore) {
+          setIsLoadingMore(true);
+          fetch(`/api/chat/history${cursor ? `?cursor=${cursor}` : ""}`)
+            .then(async (response) => {
+              if (response.ok) {
+                const data = await response.json();
+                if (data.messages && data.messages.length > 0) {
+                  const sortedMessages = [...data.messages].sort(
+                    (a, b) =>
+                      new Date(a.createdAt || 0).getTime() -
+                      new Date(b.createdAt || 0).getTime(),
+                  );
 
-                const existingMessageIds = new Set(messages.map(m => m.id));
-                const newMessages = sortedMessages.filter(msg => !existingMessageIds.has(msg.id));
+                  const existingMessageIds = new Set(messages.map((m) => m.id));
+                  const newMessages = sortedMessages.filter(
+                    (msg) => !existingMessageIds.has(msg.id),
+                  );
 
-                if (newMessages.length > 0) {
-                  setMessages(prevMessages => [...newMessages, ...prevMessages]);
-                  setCursor(data.nextCursor);
-                  setHasMore(data.hasMore);
-                  requestAnimationFrame(() => {
-                    if (target) {
-                      target.scrollTop = 100;
-                    }
-                  });
+                  if (newMessages.length > 0) {
+                    setMessages((prevMessages) => [
+                      ...newMessages,
+                      ...prevMessages,
+                    ]);
+                    setCursor(data.nextCursor);
+                    setHasMore(data.hasMore);
+                    requestAnimationFrame(() => {
+                      if (target) {
+                        target.scrollTop = 100;
+                      }
+                    });
+                  } else {
+                    setHasMore(false);
+                  }
                 } else {
                   setHasMore(false);
                 }
-              } else {
-                setHasMore(false);
               }
-            }
-          })
-          .catch(error => {
-            console.error('Failed to load more messages:', error);
-          })
-          .finally(() => {
-            setIsLoadingMore(false);
-          });
-      }
-    });
-  }, [handleScroll, cursor, hasMore, isLoadingMore, messages, setMessages]);
+            })
+            .catch((error) => {
+              console.error("Failed to load more messages:", error);
+            })
+            .finally(() => {
+              setIsLoadingMore(false);
+            });
+        }
+      });
+    },
+    [handleScroll, cursor, hasMore, isLoadingMore, messages, setMessages],
+  );
 
   // Handle new messages and scrolling
   useEffect(() => {
     if (messages.length > 0) {
-      const messagesContainer = chatBoxRef.current?.querySelector('.relative.flex-1') as HTMLDivElement | null;
+      const messagesContainer = chatBoxRef.current?.querySelector(
+        ".relative.flex-1",
+      ) as HTMLDivElement | null;
       if (messagesContainer) {
         const { scrollTop, scrollHeight, clientHeight } = messagesContainer;
         const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
         const lastMessage = messages[messages.length - 1];
-        const isUserMessage = lastMessage?.role === 'user';
+        const isUserMessage = lastMessage?.role === "user";
 
         if (isNearBottom || isUserMessage) {
-          messagesContainer.style.scrollBehavior = 'smooth';
+          messagesContainer.style.scrollBehavior = "smooth";
           requestAnimationFrame(() => {
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
             setTimeout(() => {
-              messagesContainer.style.scrollBehavior = 'auto';
+              messagesContainer.style.scrollBehavior = "auto";
             }, 300);
           });
         }
       }
-      if (!isLoading) {
+    }
+  }, [messages, chatBoxRef]);
+
+  // Separate effect for router refresh
+  useEffect(() => {
+    if (!isLoading && messages.length > 0) {
+      // Debounce the router refresh
+      const timer = setTimeout(() => {
         router.refresh();
-      }
+      }, 300);
+      return () => clearTimeout(timer);
     }
-  }, [messages, isLoading, router, chatBoxRef]);
+  }, [isLoading, messages.length, router]);
 
-  // Function to extract tool name from message
-  const extractToolName = (message: string): string | null => {
-    const toolPattern = /\[TOOL:(createTaskTool|getTasksTool|deleteTaskTool|searchTaskByTitleTool|updateTaskTool)\]/;
-    const match = message.match(toolPattern);
-    return match ? match[1] : null;
-  };
-
-  // Reset tool status
-  const resetToolStatus = useCallback(() => {
-    setIsToolVisible(false);
-    setActiveTool(null);
-  }, []);
-
-  // Watch for tool usage in messages
+  // Combine tool status effects into one
   useEffect(() => {
-    if (messages.length > 0) {
-      const lastMessage = messages[messages.length - 1];
-      if (lastMessage.role === 'assistant') {
-        const toolName = extractToolName(lastMessage.content);
-        if (toolName) {
-          setActiveTool(toolName);
-          setIsToolVisible(true);
-          
-          // Hide tool status after response is complete or after 2 seconds
-          const timer = setTimeout(resetToolStatus, 2000);
-          return () => clearTimeout(timer);
-        } else if (lastMessage.content.length > 0) {
-          // If we have content but no tool marker, hide the tool status
-          resetToolStatus();
-        }
-      }
-    }
-  }, [messages, resetToolStatus]);
+    let intervalTimer: NodeJS.Timeout;
+    let statusTimer: NodeJS.Timeout;
 
-  // Handle loading state changes
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    
-    if (isLoading) {
-      // Keep checking for tool usage while loading
-      timer = setInterval(() => {
-        if (messages.length > 0) {
-          const lastMessage = messages[messages.length - 1];
-          if (lastMessage.role === 'assistant') {
-            const toolName = extractToolName(lastMessage.content);
-            if (toolName) {
-              setActiveTool(toolName);
-              setIsToolVisible(true);
-            }
+    const updateToolStatus = () => {
+      if (messages.length > 0) {
+        const lastMessage = messages[messages.length - 1];
+        if (lastMessage.role === "assistant") {
+          const toolName = extractToolName(lastMessage.content);
+          if (toolName) {
+            setActiveTool(toolName);
+            setIsToolVisible(true);
           }
         }
-      }, 100);
+      }
+    };
+
+    if (isLoading) {
+      // Check less frequently (every 500ms instead of 100ms)
+      intervalTimer = setInterval(updateToolStatus, 500);
     } else {
-      // When loading stops, wait a bit then hide tool status if no tool is being used
-      timer = setTimeout(() => {
+      // When loading stops, wait a bit then update tool status
+      statusTimer = setTimeout(() => {
         const lastMessage = messages[messages.length - 1];
         if (!lastMessage || !extractToolName(lastMessage.content)) {
           resetToolStatus();
@@ -275,18 +280,18 @@ export function AIChatbox() {
     }
 
     return () => {
-      clearTimeout(timer);
-      clearInterval(timer);
+      clearInterval(intervalTimer);
+      clearTimeout(statusTimer);
     };
   }, [isLoading, messages, resetToolStatus]);
 
-  // Cleanup on unmount or when chat is closed
-  useEffect(() => {
-    if (!isOpen) {
-      resetToolStatus();
-    }
-    return () => resetToolStatus();
-  }, [isOpen, resetToolStatus]);
+  // Function to extract tool name from message
+  const extractToolName = (message: string): string | null => {
+    const toolPattern =
+      /\[TOOL:(createTaskTool|getTasksTool|deleteTaskTool|searchTaskByTitleTool|updateTaskTool)\]/;
+    const match = message.match(toolPattern);
+    return match ? match[1] : null;
+  };
 
   const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -299,13 +304,15 @@ export function AIChatbox() {
       stopRecording();
     }
 
-    const messagesContainer = chatBoxRef.current?.querySelector('.relative.flex-1') as HTMLDivElement | null;
+    const messagesContainer = chatBoxRef.current?.querySelector(
+      ".relative.flex-1",
+    ) as HTMLDivElement | null;
     if (messagesContainer) {
-      messagesContainer.style.scrollBehavior = 'smooth';
+      messagesContainer.style.scrollBehavior = "smooth";
       requestAnimationFrame(() => {
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
         setTimeout(() => {
-          messagesContainer.style.scrollBehavior = 'auto';
+          messagesContainer.style.scrollBehavior = "auto";
         }, 300);
       });
     }
@@ -323,7 +330,7 @@ export function AIChatbox() {
         setCopiedMessageId(null);
       }, 2000);
     } catch (err) {
-      console.error('Failed to copy message:', err);
+      console.error("Failed to copy message:", err);
       toast.error("Failed to copy message");
     }
   };
