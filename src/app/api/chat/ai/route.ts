@@ -5,7 +5,6 @@
 // src/app/api/chat/ai/route.ts
 
 import {
-  type Message,
   createDataStreamResponse,
   smoothStream,
   streamText,
@@ -15,6 +14,34 @@ import { getCurrentUser } from "@/lib/session";
 import { SYSTEM_PROMPTS } from './constants/chatConstants';
 import { saveMessageWithEmbedding, getRelevantContext } from './services/embeddings';
 import { createTaskTool, deleteTaskTool, getTasksTool, searchTaskByTitleTool, updateTaskTool } from './services/taskTool';
+
+
+interface APIError extends Error {
+  statusCode?: number;
+  responseHeaders?: Record<string, string>;
+}
+
+// Exponential backoff retry logic
+async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3, baseDelay = 1000): Promise<T> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (attempt === maxRetries) throw error;
+
+      const apiError = error as APIError;
+      if (apiError?.statusCode === 429) {
+        const retryAfter = parseInt(apiError?.responseHeaders?.['retry-after'] || '1');
+        const delay = Math.max(retryAfter * 1000, baseDelay * Math.pow(2, attempt - 1));
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+
+      throw error;
+    }
+  }
+  throw new Error('Max retries exceeded');
+}
 
 export async function POST(req: Request) {
   // Authenticate user
@@ -27,64 +54,58 @@ export async function POST(req: Request) {
     const { messages } = await req.json();
     const lastMessage = messages[messages.length - 1];
 
-    // Get relevant context
-    // TODO: Uncomment this when we have a vector db
+    // Need to use this when we have a vector db
     // const context = await getRelevantContext(user.id, lastMessage.content);
     const context = "";
-
     console.log("messages : ", messages);
+
 
     // Create streaming response
     return createDataStreamResponse({
       execute: async (dataStream) => {
-        const result = streamText({
-          model: groq('gemma2-9b-it'),
-          system: `You are a task management assistant with access to the following tools:
-                  - createTaskTool: Create new tasks
-                  - getTasksTool: View and list tasks
-                  - deleteTaskTool: Delete existing tasks 
-                  - searchTaskByTitleTool: Search for tasks by title
-                  - updateTaskTool: Update existing task details
-                  
-                  Previous context from our conversation that came from vector db : start of context ${context} : end of context
-
-                  Always analyze whether to use the tools or not.
-                  If the tools are needed, use them.
-                  If the tools are not needed, do not use them.
-                  Always maintain a professional but friendly tone, focusing on helping users be more productive and organized with their tasks.`,
-          messages,
-          experimental_activeTools: [
-            'createTaskTool',
-            'getTasksTool',
-            'deleteTaskTool',
-            'searchTaskByTitleTool',
-            'updateTaskTool',
-          ],
-          tools: {
-            createTaskTool,
-            getTasksTool,
-            deleteTaskTool,
-            searchTaskByTitleTool,
-            updateTaskTool,
-          },
-          // toolChoice: "auto",
-          maxSteps: 10,
-          experimental_transform: smoothStream({ chunking: 'word' }),
-          onFinish: async (result) => {
-            if (result.text) {
-              // Save user message with embedding
-              await saveMessageWithEmbedding(user.id, lastMessage.content, "user");
-              // Save the complete response
-              await saveMessageWithEmbedding(user.id, result.text, "assistant");
+        const result = await withRetry(async () => {
+          const streamResult = await streamText({
+            model: groq('gemma2-9b-it'), // Using smaller model with higher rate limits
+            messages: [
+              {
+                role: "system",
+                content: `You are a task management assistant with the following capabilities:
+              - createTaskTool: Create new tasks
+              - getTasksTool: List and filter tasks
+              - deleteTaskTool: Remove tasks
+              - searchTaskByTitleTool: Search tasks by title
+              - updateTaskTool: Modify existing tasks`,
+              },
+              ...messages,
+            ],
+            tools: {
+              createTaskTool,
+              getTasksTool,
+              deleteTaskTool,
+              searchTaskByTitleTool,
+              updateTaskTool,
+            },
+            maxSteps: 10,
+            experimental_transform: smoothStream({ chunking: 'word' }),
+            onFinish: async (result) => {
+              if (result.text) {
+                await saveMessageWithEmbedding(user.id, lastMessage.content, "user");
+                await saveMessageWithEmbedding(user.id, result.text, "assistant");
+              }
             }
-          }
+          });
+          return streamResult;
         });
 
         // Merge the result into the data stream
         result.mergeIntoDataStream(dataStream);
       },
-      onError: (error) => {
+      onError: (error: unknown) => {
         console.error("Error generating response:", error);
+        const apiError = error as APIError;
+        if (apiError?.statusCode === 429) {
+          return "I'm currently experiencing high demand. Please try again in a few seconds.";
+        }
         return "Sorry, I encountered an error while processing your request.";
       }
     });

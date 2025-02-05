@@ -18,6 +18,7 @@ import { useSpeechRecognition } from "./hooks/useSpeechRecognition";
 import { ChatHeader } from "./components/ChatHeader";
 import { ChatMessages } from "./components/ChatMessages";
 import { ChatInput } from "./components/ChatInput";
+import { ToolStatus } from "./components/ToolStatus";
 import VoiceStyle from "./VoiceStyle";
 
 /**
@@ -52,6 +53,8 @@ export function AIChatbox() {
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasLoadedInitialMessages, setHasLoadedInitialMessages] = useState(false);
+  const [activeTool, setActiveTool] = useState<string | null>(null);
+  const [isToolVisible, setIsToolVisible] = useState(false);
 
   // Chat and voice recognition hooks
   const {
@@ -75,10 +78,14 @@ export function AIChatbox() {
     },
     onFinish: () => {
       router.refresh();
+      setIsToolVisible(false);
+      setActiveTool(null);
     },
     onError: (error) => {
       console.error('Chat error:', error);
       toast.error("An error occurred while generating the response");
+      setIsToolVisible(false);
+      setActiveTool(null);
     },
     body: {
       userId: 1,
@@ -205,9 +212,88 @@ export function AIChatbox() {
     }
   }, [messages, isLoading, router, chatBoxRef]);
 
+  // Function to extract tool name from message
+  const extractToolName = (message: string): string | null => {
+    const toolPattern = /\[TOOL:(createTaskTool|getTasksTool|deleteTaskTool|searchTaskByTitleTool|updateTaskTool)\]/;
+    const match = message.match(toolPattern);
+    return match ? match[1] : null;
+  };
+
+  // Reset tool status
+  const resetToolStatus = useCallback(() => {
+    setIsToolVisible(false);
+    setActiveTool(null);
+  }, []);
+
+  // Watch for tool usage in messages
+  useEffect(() => {
+    if (messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage.role === 'assistant') {
+        const toolName = extractToolName(lastMessage.content);
+        if (toolName) {
+          setActiveTool(toolName);
+          setIsToolVisible(true);
+          
+          // Hide tool status after response is complete or after 2 seconds
+          const timer = setTimeout(resetToolStatus, 2000);
+          return () => clearTimeout(timer);
+        } else if (lastMessage.content.length > 0) {
+          // If we have content but no tool marker, hide the tool status
+          resetToolStatus();
+        }
+      }
+    }
+  }, [messages, resetToolStatus]);
+
+  // Handle loading state changes
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    
+    if (isLoading) {
+      // Keep checking for tool usage while loading
+      timer = setInterval(() => {
+        if (messages.length > 0) {
+          const lastMessage = messages[messages.length - 1];
+          if (lastMessage.role === 'assistant') {
+            const toolName = extractToolName(lastMessage.content);
+            if (toolName) {
+              setActiveTool(toolName);
+              setIsToolVisible(true);
+            }
+          }
+        }
+      }, 100);
+    } else {
+      // When loading stops, wait a bit then hide tool status if no tool is being used
+      timer = setTimeout(() => {
+        const lastMessage = messages[messages.length - 1];
+        if (!lastMessage || !extractToolName(lastMessage.content)) {
+          resetToolStatus();
+        }
+      }, 300);
+    }
+
+    return () => {
+      clearTimeout(timer);
+      clearInterval(timer);
+    };
+  }, [isLoading, messages, resetToolStatus]);
+
+  // Cleanup on unmount or when chat is closed
+  useEffect(() => {
+    if (!isOpen) {
+      resetToolStatus();
+    }
+    return () => resetToolStatus();
+  }, [isOpen, resetToolStatus]);
+
   const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!input.trim()) return;
+
+    // Reset tool status when submitting new message
+    resetToolStatus();
 
     if (isRecording) {
       stopRecording();
@@ -259,87 +345,90 @@ export function AIChatbox() {
   }
 
   return (
-    <Card
-      ref={chatBoxRef}
-      className={cn(
-        "fixed z-50 flex flex-col overflow-hidden shadow-xl transition-all duration-200",
-        isFullScreen || isMobile
-          ? "inset-0"
-          : "bottom-4 right-4 h-[600px] max-h-[calc(100vh-2rem)] rounded-lg",
-        isDragging && "select-none",
-      )}
-      style={
-        !isFullScreen && !isMobile
-          ? {
-            width: `${width}px`,
-            transition: isDragging ? "none" : "width 0.3s ease-in-out",
-          }
-          : undefined
-      }
-    >
-      {!isFullScreen && !isMobile && (
-        <div
-          className="absolute left-0 top-0 h-full w-2 cursor-ew-resize hover:bg-primary/10 active:bg-primary/20"
-          onMouseDown={handleMouseDown}
-          style={{ touchAction: "none" }}
-        />
-      )}
-
-      <ChatHeader
-        isFullScreen={isFullScreen}
-        isMobile={isMobile}
-        setIsFullScreen={setIsFullScreen}
-        setIsOpen={setIsOpen}
-        setWidth={setWidth}
-      />
-
-      <div
+    <>
+      <Card
+        ref={chatBoxRef}
         className={cn(
-          "relative flex-1 overflow-y-auto scroll-smooth",
-          isDragging && "pointer-events-none",
-          isFullScreen && !isMobile ? "p-6" : "px-3 py-4",
+          "fixed z-50 flex flex-col overflow-hidden shadow-xl transition-all duration-200",
+          isFullScreen || isMobile
+            ? "inset-0"
+            : "bottom-4 right-4 h-[600px] max-h-[calc(100vh-2rem)] rounded-lg",
+          isDragging && "select-none",
         )}
-        onScroll={handleChatScroll}
+        style={
+          !isFullScreen && !isMobile
+            ? {
+                width: `${width}px`,
+                transition: isDragging ? "none" : "width 0.3s ease-in-out",
+              }
+            : undefined
+        }
       >
-        <ChatMessages
-          messages={messages}
-          isLoading={isLoading}
-          isLoadingMore={isLoadingMore}
-          copiedMessageId={copiedMessageId}
-          handleCopyMessage={handleCopyMessage}
+        {!isFullScreen && !isMobile && (
+          <div
+            className="absolute left-0 top-0 h-full w-2 cursor-ew-resize hover:bg-primary/10 active:bg-primary/20"
+            onMouseDown={handleMouseDown}
+            style={{ touchAction: "none" }}
+          />
+        )}
+
+        <ChatHeader
           isFullScreen={isFullScreen}
-          isDragging={isDragging}
+          isMobile={isMobile}
+          setIsFullScreen={setIsFullScreen}
+          setIsOpen={setIsOpen}
+          setWidth={setWidth}
         />
-        <div ref={messagesEndRef} />
-      </div>
 
-      <ChatInput
-        input={input}
-        isLoading={isLoading}
-        isRecording={isRecording}
-        voiceActivity={voiceActivity}
-        textareaRef={textareaRef}
-        handleInputChange={handleInputChange}
-        handleFormSubmit={handleFormSubmit}
-        toggleMicrophone={toggleMicrophone}
-        stopRecording={stopRecording}
-        setInput={setInput}
-        adjustTextareaHeight={adjustTextareaHeight}
-        stop={stop}
-      />
-
-      {showScrollButton && (
-        <Button
-          variant="secondary"
-          size="icon"
-          className="absolute bottom-32 right-6 z-10 rounded-full shadow-lg"
-          onClick={scrollToBottom}
+        <div
+          className={cn(
+            "relative flex-1 overflow-y-auto scroll-smooth",
+            isDragging && "pointer-events-none",
+            isFullScreen && !isMobile ? "p-6" : "px-3 py-4",
+          )}
+          onScroll={handleChatScroll}
         >
-          <ArrowDown className="h-5 w-5" />
-        </Button>
-      )}
+          <ChatMessages
+            messages={messages}
+            isLoading={isLoading}
+            isLoadingMore={isLoadingMore}
+            copiedMessageId={copiedMessageId}
+            handleCopyMessage={handleCopyMessage}
+            isFullScreen={isFullScreen}
+            isDragging={isDragging}
+          />
+          <div ref={messagesEndRef} />
+        </div>
 
-      <VoiceStyle />
-    </Card>
+        <ChatInput
+          input={input}
+          isLoading={isLoading}
+          isRecording={isRecording}
+          voiceActivity={voiceActivity}
+          textareaRef={textareaRef}
+          handleInputChange={handleInputChange}
+          handleFormSubmit={handleFormSubmit}
+          toggleMicrophone={toggleMicrophone}
+          stopRecording={stopRecording}
+          setInput={setInput}
+          adjustTextareaHeight={adjustTextareaHeight}
+          stop={stop}
+        />
+
+        {showScrollButton && (
+          <Button
+            variant="secondary"
+            size="icon"
+            className="absolute bottom-32 right-6 z-10 rounded-full shadow-lg"
+            onClick={scrollToBottom}
+          >
+            <ArrowDown className="h-5 w-5" />
+          </Button>
+        )}
+
+        <VoiceStyle />
+      </Card>
+      <ToolStatus activeTool={activeTool} isVisible={isToolVisible} />
+    </>
   );
 }

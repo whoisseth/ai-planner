@@ -5,10 +5,27 @@ import { tool } from "ai";
 import { Task } from "@/components/TaskItem";
 import { revalidatePath } from "next/cache";
 
+// Helper functions for date and time formatting
+const formatDate = (date: Date): string => {
+  return date.toLocaleDateString('en-US', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  });
+};
+
+const formatTime = (date: Date): string => {
+  return date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+};
+
 // Define the task creation tool
 export const createTaskTool = tool({
   type: "function",
-  description: "Create a new task with the specified details",
+  description: "Creates and schedules new tasks with customizable title, priority, due date, and time while supporting reminders and task organization.",
   parameters: z.object({
     title: z.string().describe("The title of the task"),
     priority: z
@@ -18,11 +35,11 @@ export const createTaskTool = tool({
     dueDate: z
       .string()
       .optional()
-      .describe("Due date for the task in YYYY-MM-DD format"),
+      .describe("Due date for the task (e.g., '5 Feb 2025')"),
     dueTime: z
       .string()
       .optional()
-      .describe("Due time for the task in HH:mm format"),
+      .describe("Due time for the task (e.g., '11:30 AM')"),
   }),
   execute: async ({
     title,
@@ -46,33 +63,35 @@ export const createTaskTool = tool({
       const user = await getCurrentUser();
       if (!user) throw new Error("User not authenticated");
 
-      // Get current date and time
-      const today = new Date();
-      const defaultDate = today.toISOString().split("T")[0];
-      const defaultTime = today.toLocaleTimeString("en-US", {
-        hour12: false,
-        hour: "2-digit",
-        minute: "2-digit",
-      });
+      // Get current date
+      const now = new Date();
 
-      // Validate and parse the date
+      // Format current date and time as defaults
+      const currentFormattedDate = formatDate(now);
+      const currentFormattedTime = formatTime(now);
+
+      // Use provided values or defaults
+      const taskDate = dueDate || currentFormattedDate;
+      const taskTime = dueTime || currentFormattedTime;
+
+      // Parse and validate the date
       let parsedDate: Date;
       try {
-        parsedDate = dueDate ? new Date(dueDate) : new Date(defaultDate);
+        parsedDate = dueDate ? new Date(dueDate) : now;
         if (isNaN(parsedDate.getTime())) {
-          console.error("Invalid date provided, using default date");
-          parsedDate = new Date(defaultDate);
+          console.error("Invalid date provided, using current date");
+          parsedDate = now;
         }
       } catch (error: any) {
         console.error("Error parsing date:", error);
-        parsedDate = new Date(defaultDate);
+        parsedDate = now;
       }
 
       const taskData = {
         title,
         priority,
         dueDate: parsedDate,
-        dueTime: dueTime || defaultTime,
+        dueTime: taskTime,
         completed: false,
         userId: user.id,
       };
@@ -81,16 +100,27 @@ export const createTaskTool = tool({
 
       const task = await createTask(taskData);
       revalidatePath("/");
-      console.log("Task created successfully:", task);
 
-      return {
+      // Format the response with properly formatted date and time
+      const formattedResponse = {
         success: true,
-        message: `Task "${title}" created successfully`,
-        task,
+        task: {
+          id: task.id,
+          title: task.title,
+          priority: task.priority,
+          dueDate: formatDate(parsedDate),
+          dueTime: task.dueTime,
+          completed: task.completed
+        }
       };
+
+      return formattedResponse;
     } catch (error: any) {
       console.error("Error in createTaskTool:", error);
-      throw new Error(`Failed to create task: ${error.message}`);
+      return {
+        success: false,
+        error: `Failed to create task: ${error.message}`
+      };
     }
   },
 });
@@ -98,7 +128,7 @@ export const createTaskTool = tool({
 //  Define the to Get the task  tool
 export const getTasksTool = tool({
   type: "function",
-  description: "Get all tasks from the database with optional filtering",
+  description: "Retrieves and filters tasks based on completion status and date filters, supporting various timeframes like today, tomorrow, or specific dates.",
   parameters: z.object({
     includeCompleted: z
       .boolean()
@@ -108,7 +138,7 @@ export const getTasksTool = tool({
       .string()
       .optional()
       .describe(
-        "Filter tasks by date (e.g., 'today', 'tomorrow', or 'YYYY-MM-DD')",
+        "Filter tasks by date (e.g., 'today', 'tomorrow', or specific date like '5 Feb 2025')",
       ),
   }),
   execute: async ({
@@ -168,17 +198,14 @@ export const getTasksTool = tool({
         }
       }
 
-      // Format tasks for response
+      // Format tasks for response using the helper functions
       const formattedTasks = filteredTasks.map((task: Task) => ({
         id: task.id,
         title: task.title,
         status: task.completed ? "completed" : "active",
         priority: task.priority,
-        dueDate: task.dueDate
-          ? new Date(task.dueDate).toLocaleDateString()
-          : null,
+        dueDate: task.dueDate ? formatDate(new Date(task.dueDate)) : null,
         dueTime: task.dueTime || null,
-        subtasks: task.subtasks || [],
       }));
 
       return {
@@ -188,7 +215,10 @@ export const getTasksTool = tool({
       };
     } catch (error: any) {
       console.error("Error in getTasksTool:", error);
-      throw new Error(`Failed to get tasks: ${error.message}`);
+      return {
+        success: false,
+        error: `Failed to get tasks: ${error.message}`
+      };
     }
   },
 });
@@ -196,7 +226,7 @@ export const getTasksTool = tool({
 // Add this new tool after the existing tools
 export const deleteTaskTool = tool({
   type: "function",
-  description: "Delete a task by searching for its title first and then deleting by ID",
+  description: "Removes tasks from the task list using intelligent title-based search to find and delete the most relevant matching task.",
   parameters: z.object({
     title: z.string().describe("The title of the task to delete"),
   }),
@@ -227,7 +257,7 @@ export const deleteTaskTool = tool({
 // search task by title
 export const searchTaskByTitleTool = tool({
   type: "function",
-  description: "Search for tasks by title",
+  description: "Searches for tasks using fuzzy matching on titles to find exact or similar matches within the user's task list.",
   parameters: z.object({
     title: z.string().describe("The title of the task to search for"),
   }),
@@ -242,7 +272,7 @@ export const searchTaskByTitleTool = tool({
 // Add this new tool before the final export
 export const updateTaskTool = tool({
   type: "function",
-  description: "Update an existing task's details",
+  description: "Modifies existing tasks by updating any combination of title, priority, due date, time, or completion status while preserving unchanged fields.",
   parameters: z.object({
     taskId: z.string().describe("The ID of the task to update"),
     title: z.string().optional().describe("The new title of the task"),

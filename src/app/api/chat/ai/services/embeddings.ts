@@ -29,7 +29,7 @@ export async function saveMessageWithEmbedding(
   role: "user" | "assistant",
 ) {
   // Generate embedding for the message
-  const embedding = await getEmbedding(content);
+  // const embedding = await getEmbedding(content);
 
   // Save message to chat history
   const [message] = await db
