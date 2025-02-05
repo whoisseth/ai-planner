@@ -62,6 +62,7 @@ export function AIChatbox() {
     handleSubmit: handleChatSubmit,
     isLoading,
     setMessages,
+    stop,
   } = useChat({
     api: "/api/chat/ai",
     initialMessages: initialMessages,
@@ -77,6 +78,7 @@ export function AIChatbox() {
     },
     onError: (error) => {
       console.error('Chat error:', error);
+      toast.error("An error occurred while generating the response");
     },
     body: {
       userId: 1,
@@ -323,6 +325,7 @@ export function AIChatbox() {
         stopRecording={stopRecording}
         setInput={setInput}
         adjustTextareaHeight={adjustTextareaHeight}
+        stop={stop}
       />
 
       {showScrollButton && (

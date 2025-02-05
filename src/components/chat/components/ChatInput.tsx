@@ -1,8 +1,9 @@
 import React, { RefObject } from 'react';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Mic, MicOff, Send } from "lucide-react";
+import { Loader2, Mic, MicOff, Send, Square } from "lucide-react";
 import { VoiceWave } from '../VoiceWave';
+import { cn } from "@/lib/utils";
 
 interface ChatInputProps {
     input: string;
@@ -16,6 +17,7 @@ interface ChatInputProps {
     stopRecording: () => void;
     setInput: (text: string) => void;
     adjustTextareaHeight: () => void;
+    stop: () => void;
 }
 
 /**
@@ -34,6 +36,7 @@ export function ChatInput({
     stopRecording,
     setInput,
     adjustTextareaHeight,
+    stop,
 }: ChatInputProps) {
     return (
         <div className="border-t px-4 py-3">
@@ -86,25 +89,34 @@ export function ChatInput({
                             <Mic className="size-5 text-zinc-400" />
                         )}
                     </Button>
-                    <Button
-                        type="submit"
-                        variant="ghost"
-                        size="icon"
-                        disabled={isLoading || !input.trim()}
-                        className="rounded-full"
-                        onClick={(e) => {
-                            e.preventDefault();
-                            if (input.trim()) {
-                                handleFormSubmit(e as any);
-                            }
-                        }}
-                    >
-                        {isLoading ? (
-                            <Loader2 className="h-5 w-5 animate-spin" />
-                        ) : (
+                    {isLoading ? (
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className={cn("rounded-full")}
+                            onClick={stop}
+                            title="Stop generating"
+                        >
+                            <Square className="h-5 w-5" />
+                        </Button>
+                    ) : (
+                        <Button
+                            type="submit"
+                            variant="ghost"
+                            size="icon"
+                            disabled={!input.trim()}
+                            className="rounded-full"
+                            onClick={(e) => {
+                                e.preventDefault();
+                                if (input.trim()) {
+                                    handleFormSubmit(e as any);
+                                }
+                            }}
+                        >
                             <Send className="h-5 w-5" />
-                        )}
-                    </Button>
+                        </Button>
+                    )}
                 </div>
             </div>
         </div>
