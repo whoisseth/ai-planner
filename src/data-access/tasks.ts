@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { tasks } from "@/db/schema";
 import { UserId } from "@/use-cases/types";
-import { eq, and, ilike, sql } from "drizzle-orm";
+import { eq, and, ilike, sql, desc } from "drizzle-orm";
 import { Task } from "@/db/schema";
 
 export async function createTask(
@@ -59,7 +59,8 @@ export async function getTasksByUserId(userId: UserId) {
   const userTasks = await db
     .select()
     .from(tasks)
-    .where(eq(tasks.userId, userId));
+    .where(eq(tasks.userId, userId))
+    .orderBy(desc(tasks.updatedAt));
   return userTasks;
 }
 
@@ -72,7 +73,6 @@ export async function getTaskById(userId: UserId, taskId: string) {
   return task[0];
 }
 
-
 // search task by title
 export async function searchTaskByTitle(userId: number, searchTerm: string) {
   return await db
@@ -81,8 +81,7 @@ export async function searchTaskByTitle(userId: number, searchTerm: string) {
     .where(
       and(
         eq(tasks.userId, userId),
-        sql`lower(${tasks.title}) LIKE lower(${'%' + searchTerm + '%'})`
-      )
+        sql`lower(${tasks.title}) LIKE lower(${"%" + searchTerm + "%"})`,
+      ),
     );
 }
-
