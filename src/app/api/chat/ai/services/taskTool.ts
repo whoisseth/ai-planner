@@ -34,9 +34,30 @@ const convertTo24HourFormat = (time: string): string => {
   if (!time) return "";
 
   try {
-    // Parse time components
+    // Check if the time is already in 24-hour format (HH:mm)
+    if (/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(time)) {
+      // Already in correct format, just ensure it's padded correctly
+      const [hours, minutes] = time.split(":").map((num) => parseInt(num));
+      return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+    }
+
+    // Handle 12-hour format (e.g., "1:30 PM")
     const [timePart, meridiem] = time.toUpperCase().split(" ");
+    if (!meridiem || !["AM", "PM"].includes(meridiem)) {
+      return "";
+    }
+
     let [hours, minutes] = timePart.split(":").map((num) => parseInt(num));
+    if (
+      isNaN(hours) ||
+      isNaN(minutes) ||
+      hours < 1 ||
+      hours > 12 ||
+      minutes < 0 ||
+      minutes > 59
+    ) {
+      return "";
+    }
 
     // Convert to 24-hour format
     if (meridiem === "PM" && hours !== 12) {
@@ -75,7 +96,7 @@ export const createTaskTool = tool({
   }),
   execute: async ({
     title,
-    priority = "Medium",
+    priority = "Low",
     dueDate,
     dueTime,
   }: {
@@ -98,15 +119,7 @@ export const createTaskTool = tool({
       // Get current date
       const now = new Date();
 
-      // Format current date and time as defaults
-      const currentFormattedDate = formatDate(now);
-      const currentFormattedTime = formatTime(now);
-
-      // Use provided values or defaults
-      const taskDate = dueDate || currentFormattedDate;
-      const taskTime = dueTime || currentFormattedTime;
-
-      // Parse and validate the date
+      // Parse the date if provided
       let parsedDate: Date;
       try {
         parsedDate = dueDate ? new Date(dueDate) : now;
@@ -119,11 +132,22 @@ export const createTaskTool = tool({
         parsedDate = now;
       }
 
+      // Format the time if provided
+      let formattedTime = dueTime;
+      if (dueTime) {
+        formattedTime = convertTo24HourFormat(dueTime);
+        if (!formattedTime) {
+          throw new Error(
+            "Invalid time format. Please use either 24-hour format (HH:mm) or 12-hour format (h:mm AM/PM)",
+          );
+        }
+      }
+
       const taskData = {
         title,
         priority,
         dueDate: parsedDate,
-        dueTime: taskTime,
+        dueTime: formattedTime || null,
         completed: false,
         userId: user.id,
       };
@@ -131,11 +155,11 @@ export const createTaskTool = tool({
       console.log("Processed task data:", taskData);
 
       const task = await createTask(taskData);
-      revalidatePath("/");
+      revalidatePath("/dashboard");
 
-      // Format the response with properly formatted date and time
-      const formattedResponse = {
+      return {
         success: true,
+        message: `Task "${title}" has been created successfully.`,
         task: {
           id: task.id,
           title: task.title,
@@ -145,8 +169,6 @@ export const createTaskTool = tool({
           completed: task.completed,
         },
       };
-
-      return formattedResponse;
     } catch (error: any) {
       console.error("Error in createTaskTool:", error);
       return {
@@ -259,8 +281,7 @@ export const getTasksTool = tool({
 // Add this new tool after the existing tools
 export const deleteTaskTool = tool({
   type: "function",
-  description:
-    "Removes tasks from the task list using intelligent title-based search to find and delete the most relevant matching task.",
+  description: "Delete the task with the given title",
   parameters: z.object({
     title: z.string().describe("The title of the task to delete"),
   }),
@@ -284,7 +305,10 @@ export const deleteTaskTool = tool({
       };
     } catch (error: any) {
       console.error("Error in deleteTaskTool:", error);
-      throw new Error(`Failed to delete task: ${error.message}`);
+      return {
+        success: false,
+        error: `Failed to delete task: ${error.message}`,
+      };
     }
   },
 });
@@ -388,7 +412,7 @@ export const updateTaskTool = tool({
           updateData.dueTime = formattedTime;
         } else {
           throw new Error(
-            "Invalid time format. Please provide time in '1:30 PM' or '13:30' format",
+            "Invalid time format. Please use either 24-hour format (HH:mm) or 12-hour format (h:mm AM/PM)",
           );
         }
       }

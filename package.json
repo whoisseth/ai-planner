@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@ai-sdk/cohere": "^1.1.6",
+    "@ai-sdk/fireworks": "^0.1.8",
     "@ai-sdk/groq": "^1.1.7",
     "@ai-sdk/provider": "^1.0.7",
     "@aws-sdk/client-ses": "^3.731.1",
