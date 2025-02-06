@@ -78,7 +78,7 @@ const convertTo24HourFormat = (time: string): string => {
 export const createTaskTool = tool({
   type: "function",
   description:
-    "Creates and schedules new tasks with customizable title, priority, due date, and time while supporting reminders and task organization.",
+    "Creates and schedules new tasks with customizable title, priority, due date, and time while supporting reminders and task organization. And if the task due date and time is not provided then automatically analyse what should be the best time for and due date for that task",
   parameters: z.object({
     title: z.string().describe("The title of the task"),
     priority: z
@@ -87,6 +87,7 @@ export const createTaskTool = tool({
       .describe("Priority level of the task"),
     dueDate: z
       .string()
+      .nullable()
       .optional()
       .describe("Due date for the task (e.g., '5 Feb 2025')"),
     dueTime: z
@@ -102,7 +103,7 @@ export const createTaskTool = tool({
   }: {
     title: string;
     priority?: "Low" | "Medium" | "High" | "Urgent";
-    dueDate?: string;
+    dueDate?: string | null;
     dueTime?: string;
   }) => {
     try {
@@ -121,15 +122,19 @@ export const createTaskTool = tool({
 
       // Parse the date if provided
       let parsedDate: Date;
-      try {
-        parsedDate = dueDate ? new Date(dueDate) : now;
-        if (isNaN(parsedDate.getTime())) {
-          console.error("Invalid date provided, using current date");
+      if (dueDate === null) {
+        parsedDate = now;
+      } else {
+        try {
+          parsedDate = dueDate ? new Date(dueDate) : now;
+          if (isNaN(parsedDate.getTime())) {
+            console.error("Invalid date provided, using current date");
+            parsedDate = now;
+          }
+        } catch (error: any) {
+          console.error("Error parsing date:", error);
           parsedDate = now;
         }
-      } catch (error: any) {
-        console.error("Error parsing date:", error);
-        parsedDate = now;
       }
 
       // Format the time if provided
@@ -159,7 +164,7 @@ export const createTaskTool = tool({
 
       return {
         success: true,
-        message: `Task "${title}" has been created successfully.`,
+        message: `Task "${title}" has been created successfully. `,
         task: {
           id: task.id,
           title: task.title,
@@ -183,7 +188,7 @@ export const createTaskTool = tool({
 export const getTasksTool = tool({
   type: "function",
   description:
-    "Returns tasks based on user's request - can show all tasks or filter by specific conditions like showing only today's tasks, tomorrow's tasks, or tasks for a specific date. Also supports filtering by completion status.",
+    "Returns tasks based on user's request - can show all tasks or filter by specific conditions like showing only today's tasks, tomorrow's tasks, high priority task, medium priority task, low priority task,Search by title, or tasks for a specific date. Also supports filtering by completion status, .",
   parameters: z.object({
     includeCompleted: z
       .boolean()
