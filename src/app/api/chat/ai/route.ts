@@ -9,19 +9,40 @@ import {
   updateTaskTool,
 } from "./services/taskTool";
 import { groq } from "@ai-sdk/groq";
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
+
+const lmstudio = createOpenAICompatible({
+  name: 'lmstudio',
+  baseURL: 'http://localhost:1234/v1',
+});
+
+
+
+export const maxDuration = 300;
 
 export async function POST(req: Request) {
+  console.log("🚀 Chat API route handler started");
+
   const user = await getCurrentUser();
   if (!user) {
+    console.log("❌ Authentication failed - no user found");
     return new Response("Unauthorized", { status: 401 });
   }
+  console.log("✅ User authenticated:", user.id);
 
   try {
-    const { messages } = await req.json();
+    const body = await req.json();
+    console.log("📝 Received request body:", JSON.stringify(body, null, 2));
+
+    const { messages } = body;
     const conversation = messages.slice(-4);
     const lastMessage = conversation[conversation.length - 1];
 
-    // Define the system prompt with clear instructions
+    console.log("💬 Processing conversation:", {
+      conversationLength: conversation.length,
+      lastMessage: lastMessage.content
+    });
+
     const systemPrompt = `
       You are a task management assistant. Your role is to help manage tasks effectively and provide clear responses.
 
@@ -45,50 +66,110 @@ export async function POST(req: Request) {
       5. For task listing: Summarize the tasks shown
 
       Keep responses concise and focused on task management.
+      YOU MUST ALWAYS RESPOND TO THE USER, even if just to acknowledge their greeting
+      You must always give resoponse in english.
     `;
 
-    // Create streaming response
     return createDataStreamResponse({
       execute: async (dataStream) => {
-        const result = await streamText({
-          model: groq("gemma2-9b-it"),
-          messages: [
-            { role: "system", content: systemPrompt },
-            ...conversation,
-          ],
-          tools: {
-            createTaskTool,
-            getTasksTool,
-            deleteTaskTool,
-            searchTaskByTitleTool,
-            updateTaskTool,
-          },
-          toolCallStreaming: true,
-          maxSteps: 10,
-          maxTokens: 1000,
-          temperature: 0.7,
-          topP: 0.8,
+        console.log("🎯 Starting AI stream generation");
+        try {
+          // First try with Ollama
+          try {
+            console.log("📡 Attempting to use Ollama model...");
+            const result = await streamText({
+              model: lmstudio("qwen2-math-1.5b-instruct"),
+              // model: lmstudio("qwen2-0.5b-instruct"),
+              messages: [
+                { role: "system", content: systemPrompt },
+                ...conversation,
+              ],
+              tools: {
+                createTaskTool,
+                getTasksTool,
+                deleteTaskTool,
+                searchTaskByTitleTool,
+                updateTaskTool,
+              },
+              maxTokens: 2000,
+              temperature: 0.7,
+              // toolCallStreaming: true,
+              maxSteps: 5,
+              onStepFinish: async (event) => {
+                console.log("🔄 Step finished event:", {
+                  stepType: event.stepType,
+                  hasText: !!event.text,
+                  toolCallsCount: event.toolCalls?.length || 0,
+                  finishReason: event.finishReason,
+                  usage: event.usage,
+                  responseText: event.text
+                });
 
-          onFinish: async (result) => {
-            if (result.text) {
-              await saveMessageWithEmbedding(
-                user.id,
-                lastMessage.content,
-                "user",
-              );
-              await saveMessageWithEmbedding(user.id, result.text, "assistant");
-            }
-          },
-        });
-        result.mergeIntoDataStream(dataStream);
+                if (event.toolCalls?.length > 0) {
+                  console.log("🛠️ Tool calls made:", JSON.stringify(event.toolCalls, null, 2));
+                }
+
+                if (event.text) {
+                  console.log("📤 Generated text:", event.text);
+                }
+              },
+              onFinish: async (result) => {
+                console.log("✅ Stream generation finished", {
+                  hasText: !!result.text,
+                  textLength: result.text?.length,
+                  finalText: result.text
+                });
+
+                if (result.text) {
+                  await saveMessageWithEmbedding(
+                    user.id,
+                    lastMessage.content,
+                    "user",
+                  );
+                  await saveMessageWithEmbedding(
+                    user.id,
+                    result.text,
+                    "assistant",
+                  );
+                  console.log("💾 Messages saved to database");
+                } else {
+                  console.warn("⚠️ No text generated in the result");
+                  const fallbackResponse = "Hello! I'm here to help you manage your tasks. How can I assist you today?";
+                  await saveMessageWithEmbedding(
+                    user.id,
+                    lastMessage.content,
+                    "user",
+                  );
+                  await saveMessageWithEmbedding(
+                    user.id,
+                    fallbackResponse,
+                    "assistant",
+                  );
+                  dataStream.write(`0:${fallbackResponse}\n`);
+                }
+              },
+            });
+            console.log("🔄 Merging result into data stream");
+            result.mergeIntoDataStream(dataStream);
+          } catch (error) {
+            console.error("❌ stream generation failed:", error);
+            throw error;
+          }
+        } catch (streamError) {
+          console.error("❌ Error in stream generation:", streamError);
+          throw streamError;
+        }
       },
       onError: (error: unknown) => {
-        console.error("Error generating response:", error);
+        console.error("❌ Error generating response:", error);
+        if (error instanceof Error) {
+          return `An error occurred: ${error.message}`;
+        }
         return "An error occurred while processing your request.";
       },
     });
   } catch (error) {
-    console.error("Error in chat route:", error);
+    console.error("❌ Fatal error in chat route:", error);
     return new Response(
       JSON.stringify({ error: "Failed to process request" }),
       { status: 500, headers: { "Content-Type": "application/json" } },
