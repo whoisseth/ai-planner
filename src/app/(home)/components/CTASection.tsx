@@ -42,7 +42,7 @@ export default function CTASection() {
               asChild
               size="lg"
               variant="outline"
-              className="gap-2 border-purple-400/20 bg-purple-500/10 text-purple-100 backdrop-blur-sm transition-all duration-300 hover:bg-purple-500/20"
+              className="gap-2 border-purple-500/20 bg-purple-500/5 text-purple-100 transition-all duration-300 hover:border-purple-500/30 hover:bg-purple-500/10 hover:text-white hover:shadow-lg hover:shadow-purple-500/10 backdrop-blur-sm"
             >
               <Link href="#features">See How It Works</Link>
             </Button>

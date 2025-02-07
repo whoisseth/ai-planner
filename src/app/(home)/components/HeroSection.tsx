@@ -8,7 +8,7 @@ export default function HeroSection() {
       {/* Decorative elements */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_110%)]" />
       <div className="absolute right-0 top-0 h-[400px] w-[400px] rounded-full bg-purple-600/20 blur-[120px]" />
-      <div className="absolute left-0 bottom-0 h-[300px] w-[300px] rounded-full bg-purple-600/20 blur-[120px]" />
+      <div className="absolute bottom-0 left-0 h-[300px] w-[300px] rounded-full bg-purple-600/20 blur-[120px]" />
 
       <div className="container relative mx-auto px-4 py-24 sm:py-32 lg:py-40">
         <div className="flex flex-col items-center text-center">
@@ -41,7 +41,7 @@ export default function HeroSection() {
               asChild
               size="lg"
               variant="outline"
-              className="gap-2 border-purple-400/20 bg-purple-500/10 text-purple-100 backdrop-blur-sm hover:bg-purple-500/20"
+              className="gap-2 border-purple-500/20 bg-purple-500/5 text-purple-100 backdrop-blur-sm transition-all duration-300 hover:border-purple-500/30 hover:bg-purple-500/10 hover:text-white hover:shadow-lg hover:shadow-purple-500/10"
             >
               <Link href="#features">
                 <Brain className="h-4 w-4" /> See How It Works
