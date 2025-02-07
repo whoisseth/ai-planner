@@ -7,6 +7,7 @@ import MarkdownPreview from "@uiw/react-markdown-preview";
 import { chatStyles } from "../styles";
 import { AiAvatar } from "./AiAvatar";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAutoAnimate } from "@formkit/auto-animate/react";
 
 interface ChatMessagesProps {
   messages: Message[];
@@ -108,6 +109,7 @@ export function ChatMessages({
   isFullScreen,
   isDragging,
 }: ChatMessagesProps) {
+  const [animationParent] = useAutoAnimate();
   return (
     <div className={cn("space-y-4", isFullScreen && "mx-auto max-w-5xl")}>
       {isLoadingMore && (
@@ -133,6 +135,7 @@ export function ChatMessages({
             >
               {message.role === "assistant" && <AiAvatar />}
               <div
+                ref={animationParent}
                 className={cn(
                   "group relative rounded-lg px-3",
                   message.role === "user"
@@ -155,7 +158,33 @@ export function ChatMessages({
                         "!text-sm [&_li]:!my-0.5 [&_ol]:!my-0.5 [&_p+p]:!mt-1.5 [&_p]:!my-0.5 [&_pre]:!my-1 [&_ul]:!my-0.5",
                       )}
                     />
-                    {!message.isStreaming && (
+                    {message.toolInvocations &&
+                    message.toolInvocations.some(
+                      (toolInvocation) => toolInvocation.args,
+                    ) &&
+                    message.content.length < 1 ? (
+                      <>
+                        {message.toolInvocations.map((toolInvocation) => (
+                          <div
+                            key={toolInvocation.toolName}
+                            className="space-y-2 text-sm"
+                          >
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <span className="font-medium">
+                                Calling '{toolInvocation.toolName}'
+                              </span>
+                              <ThinkingDots />
+                            </div>
+                            <pre className="overflow-x-auto rounded-md bg-muted/50 p-3 text-xs">
+                              <code className="text-foreground/90">
+                                {JSON.stringify(toolInvocation.args, null, 2)}
+                              </code>
+                            </pre>
+                          </div>
+                        ))}
+                      </>
+                    ) : null}
+                    {message.content && (
                       <div className="mt-1.5 flex justify-start">
                         <Button
                           size="sm"
@@ -187,7 +216,6 @@ export function ChatMessages({
           {isLoading && messages[messages.length - 1]?.role === "user" && (
             <ThinkingMessage />
           )}
-          {/* <ThinkingMessage /> */}
         </div>
       )}
     </div>
