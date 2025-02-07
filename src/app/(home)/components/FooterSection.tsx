@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Sparkles, Twitter, Github, Linkedin } from "lucide-react";
+import { Twitter, Github, Linkedin } from "lucide-react";
+import { Logo } from "@/components/Logo";
 
 const footerLinks = [
   {
@@ -50,15 +51,7 @@ export default function FooterSection() {
         <div className="grid gap-8 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
           {/* Brand Column */}
           <div className="space-y-4">
-            <Link
-              href="/"
-              className="group inline-flex items-center gap-2 text-xl font-bold"
-            >
-              <Sparkles className="h-5 w-5 text-purple-500 transition-transform duration-300 group-hover:rotate-12" />
-              <span className="bg-gradient-to-r from-purple-600 to-purple-500 bg-clip-text text-transparent">
-                AI Planner
-              </span>
-            </Link>
+            <Logo size="lg" forceShowText />
             <p className="text-sm text-purple-100/60">
               Transform your productivity with intelligent planning and
               AI-powered insights.
