@@ -104,7 +104,26 @@ export function AIChatbox() {
       setActiveTool(null);
     },
     onToolCall: (toolCall) => {
-      console.log("Tool call:", toolCall);
+      const toolName = toolCall.toolCall.toolName;
+      console.log("Tool call from ui :", `---${toolName}---`);
+      setActiveTool(toolName);
+      setIsToolVisible(true);
+
+      // Update the last message to show tool status
+      setMessages((prev) => {
+        const lastMessage = prev[prev.length - 1];
+        if (lastMessage && lastMessage.role === "assistant") {
+          return [
+            ...prev.slice(0, -1),
+            {
+              ...lastMessage,
+              content: lastMessage.content + `\n\n[TOOL:${toolName}]`,
+              isStreaming: true,
+            },
+          ];
+        }
+        return prev;
+      });
     },
   });
 

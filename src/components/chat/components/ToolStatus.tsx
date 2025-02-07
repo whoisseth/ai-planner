@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { Loader2, Check } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface ToolStatusProps {
@@ -17,7 +17,7 @@ export function ToolStatus({ activeTool, isVisible }: ToolStatusProps) {
       setIsCompleting(false);
     } else {
       setIsCompleting(true);
-      const timer = setTimeout(() => setIsShowing(false), 200);
+      const timer = setTimeout(() => setIsShowing(false), 1000);
       return () => clearTimeout(timer);
     }
   }, [isVisible, activeTool]);
@@ -26,45 +26,61 @@ export function ToolStatus({ activeTool, isVisible }: ToolStatusProps) {
 
   const getToolConfig = (tool: string) => {
     const configs = {
-      create: {
+      createTask: {
         color: "bg-emerald-500/10 text-emerald-500 ring-emerald-500/20",
         icon: "✨",
-        label: "Creating",
-        responseEmoji: "✅"
+        label: "Creating Task",
+        responseEmoji: "✅",
+        description: "Creating a new task for you"
       },
-      get: {
+      getTasks: {
         color: "bg-sky-500/10 text-sky-500 ring-sky-500/20",
         icon: "📋",
-        label: "Fetching",
-        responseEmoji: "📊"
+        label: "Fetching Tasks",
+        responseEmoji: "📊",
+        description: "Retrieving your tasks"
       },
-      delete: {
+      deleteTask: {
         color: "bg-rose-500/10 text-rose-500 ring-rose-500/20",
         icon: "🗑️",
-        label: "Deleting",
-        responseEmoji: "🚫"
+        label: "Deleting Task",
+        responseEmoji: "🚫",
+        description: "Removing the specified task"
       },
-      search: {
+      searchTask: {
         color: "bg-violet-500/10 text-violet-500 ring-violet-500/20",
         icon: "🔍",
-        label: "Searching",
-        responseEmoji: "🎯"
+        label: "Searching Tasks",
+        responseEmoji: "🎯",
+        description: "Searching through your tasks"
       },
-      update: {
+      updateTask: {
         color: "bg-amber-500/10 text-amber-500 ring-amber-500/20",
         icon: "📝",
-        label: "Updating",
-        responseEmoji: "✨"
+        label: "Updating Task",
+        responseEmoji: "✨",
+        description: "Updating task details"
+      },
+      dateTime: {
+        color: "bg-blue-500/10 text-blue-500 ring-blue-500/20",
+        icon: "🕒",
+        label: "Processing Time",
+        responseEmoji: "⏰",
+        description: "Processing date and time"
       },
       default: {
         color: "bg-slate-500/10 text-slate-500 ring-slate-500/20",
         icon: "🤖",
         label: "Processing",
-        responseEmoji: "✨"
+        responseEmoji: "✨",
+        description: "Processing your request"
       }
     };
 
-    const type = Object.keys(configs).find(key => tool.toLowerCase().includes(key)) || 'default';
+    const type = Object.keys(configs).find(key => 
+      tool.toLowerCase().replace(/tool$/, '') === key.toLowerCase()
+    ) || 'default';
+    
     return configs[type as keyof typeof configs];
   };
 
@@ -74,8 +90,8 @@ export function ToolStatus({ activeTool, isVisible }: ToolStatusProps) {
     <div
       className={cn(
         "fixed left-1/2 top-4 z-50 -translate-x-1/2 transform",
-        "flex items-center gap-2 rounded-full px-4 py-1.5",
-        "shadow-lg backdrop-blur-sm transition-all duration-300",
+        "flex flex-col items-center gap-1 rounded-lg px-4 py-2",
+        "shadow-lg backdrop-blur-sm transition-all duration-500",
         "border border-primary/10",
         config.color,
         isVisible 
@@ -84,16 +100,30 @@ export function ToolStatus({ activeTool, isVisible }: ToolStatusProps) {
       )}
     >
       <div className="flex items-center gap-2">
-        <div className="flex items-center gap-1">
-          <span className="text-base transition-all duration-300">
+        <div className="flex items-center gap-2">
+          <span className="text-lg transition-all duration-300">
             {isCompleting ? config.responseEmoji : config.icon}
           </span>
-          {!isCompleting && <Loader2 className="h-3 w-3 animate-spin" />}
+          {!isCompleting && (
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span className="text-sm font-medium tracking-wide">
+                {config.label}
+              </span>
+            </div>
+          )}
+          {isCompleting && (
+            <span className="text-sm font-medium tracking-wide animate-fade-in">
+              Done
+            </span>
+          )}
         </div>
-        <span className="text-xs font-medium tracking-wide">
-          {isCompleting ? "Done" : config.label}
-        </span>
       </div>
+      {!isCompleting && (
+        <p className="text-xs text-muted-foreground animate-fade-in">
+          {config.description}
+        </p>
+      )}
     </div>
   );
 } 

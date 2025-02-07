@@ -59,7 +59,13 @@ export interface ChatHistoryResponse {
   nextCursor: string | null;
 }
 
-import { Message } from "ai";
+import { Message as AIMessage } from "ai";
+
+// Extend the Message type to include our custom properties
+export interface Message extends AIMessage {
+  createdAt?: Date;
+  isStreaming?: boolean;
+}
 
 // Props and state interfaces
 export interface ChatUIState {
