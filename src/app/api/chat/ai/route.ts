@@ -85,7 +85,8 @@ export async function POST(req: Request) {
       5. For task listing: Summarize the tasks shown
       6. For date/time queries: Display in a clear, readable format with timezone information
 
-      You must always respond in English and MUST use tools for ANY task-related operation.
+    You must always respond in English, be as concise as possible, and ensure every response is the shortest possible while remaining logical. Always use tools for any task-related operations. This is a strict requirement.
+    
       NEVER skip using tools when handling task-related requests.
       
       Current user's timezone: ${userTimeZone}
