@@ -20,9 +20,9 @@ export function Logo({
   variant = "white",
 }: LogoProps) {
   const sizeClasses = {
-    sm: "text-lg",
-    md: "text-xl",
-    lg: "text-2xl",
+    sm: "text-sm",
+    md: "text-base",
+    lg: "text-lg",
   };
 
   const iconSizes = {
@@ -37,7 +37,7 @@ export function Logo({
     <Component
       href={href as string}
       className={cn(
-        "group inline-flex items-center gap-2 font-semibold transition-opacity hover:opacity-90",
+        "group inline-flex items-center gap-2 font-medium transition-opacity hover:opacity-90",
         sizeClasses[size],
         className,
       )}

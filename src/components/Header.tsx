@@ -13,6 +13,7 @@ import {
 import { useTheme } from "next-themes";
 import { SignOutButton } from "./SignOutButton";
 import React from "react";
+import { Logo } from "./Logo";
 
 export default function Header() {
   const { setTheme, theme } = useTheme();
@@ -42,7 +43,9 @@ export default function Header() {
   return (
     <header className="flex h-full max-h-14 items-center gap-4 border-b px-6 lg:h-[60px]">
       <div className="flex-1">
-        <h1 className="text-lg font-semibold">AI Planner</h1>
+        <div className="lg:hidden">
+          <Logo size="sm" forceShowText className="text-sm" />
+        </div>
       </div>
       {renderThemeChanger()}
       <Button size="icon" variant="ghost">

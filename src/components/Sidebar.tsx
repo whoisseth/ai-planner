@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Logo } from "@/components/Logo";
 import {
   LayoutDashboard,
   CalendarDays,
@@ -33,10 +34,7 @@ export default function Sidebar() {
       {/* Desktop Sidebar */}
       <div className="hidden h-full w-56 flex-col border-r bg-background lg:flex">
         <div className="flex h-full max-h-14 items-center border-b px-4">
-          <Link className="flex items-center gap-2 font-semibold" href="/">
-            <LayoutDashboard className="h-6 w-6" />
-            <span>AI Planner</span>
-          </Link>
+          <Logo href="/" forceShowText size="lg" />
         </div>
         <ScrollArea className="flex-1">
           <nav className="flex flex-col gap-2 p-2">
