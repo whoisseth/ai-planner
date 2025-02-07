@@ -1,37 +1,75 @@
+"use client";
+
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Brain, Sparkles } from "lucide-react";
+import { motion } from "framer-motion";
 
 export default function HeroSection() {
   return (
-    <header className="relative overflow-hidden bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
+    <header className="relative">
       {/* Decorative elements */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_110%)]" />
-      <div className="absolute right-0 top-0 h-[400px] w-[400px] rounded-full bg-purple-600/20 blur-[120px]" />
-      <div className="absolute bottom-0 left-0 h-[300px] w-[300px] rounded-full bg-purple-600/20 blur-[120px]" />
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 0.5 }}
+        transition={{ duration: 1.5 }}
+        className="absolute right-1/2 top-1/2 h-[500px] w-[500px] -translate-y-1/2 translate-x-1/2 rounded-full bg-[#2D2B55]/20 blur-[100px]"
+      />
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 0.4 }}
+        transition={{ duration: 1.5, delay: 0.2 }}
+        className="absolute right-1/4 top-1/4 h-[400px] w-[400px] rounded-full bg-[#2D2B55]/20 blur-[100px]"
+      />
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 0.3 }}
+        transition={{ duration: 1.5, delay: 0.4 }}
+        className="absolute left-1/4 bottom-1/4 h-[300px] w-[300px] rounded-full bg-[#2D2B55]/20 blur-[100px]"
+      />
 
       <div className="container relative mx-auto px-4 py-24 sm:py-32 lg:py-40">
         <div className="flex flex-col items-center text-center">
-          <div className="inline-flex items-center rounded-full border border-purple-500/20 bg-purple-500/10 px-3 py-1 text-sm text-purple-200 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="inline-flex items-center rounded-full border border-[#2D2B55] bg-[#2D2B55]/10 px-3 py-1 text-sm text-purple-200 backdrop-blur-sm"
+          >
             <Sparkles className="mr-2 h-3.5 w-3.5 text-purple-300" />
             AI-Powered Task Management
-          </div>
+          </motion.div>
 
-          <h1 className="mt-6 max-w-4xl bg-gradient-to-br from-white via-purple-100 to-purple-200 bg-clip-text text-4xl font-bold tracking-tight text-transparent sm:text-5xl lg:text-6xl">
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="mt-6 max-w-4xl bg-gradient-to-br from-white via-[#E4E4E7] to-[#A1A1AA] bg-clip-text text-4xl font-bold tracking-tight text-transparent sm:text-5xl lg:text-6xl"
+          >
             Transform Your Productivity with Intelligent Planning
-          </h1>
+          </motion.h1>
 
-          <p className="mt-6 max-w-2xl text-lg text-purple-100/80">
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="mt-6 max-w-2xl text-lg text-[#E4E4E7]/80"
+          >
             Experience the future of task management with our AI assistant.
             Optimize your workflow, reduce stress, and accomplish more with
             intelligent scheduling and personalized insights.
-          </p>
+          </motion.p>
 
-          <div className="mt-10 flex flex-col gap-4 sm:flex-row">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+            className="mt-10 flex flex-col gap-4 sm:flex-row"
+          >
             <Button
               asChild
               size="lg"
-              className="gap-2 bg-purple-600 text-white hover:bg-purple-700"
+              className="gap-2 bg-[#2D2B55] text-white transition-all duration-300 hover:bg-[#2D2B55]/90 hover:shadow-lg hover:shadow-[#2D2B55]/20"
             >
               <Link href="/dashboard">
                 Get Started Free <ArrowRight className="h-4 w-4" />
@@ -41,13 +79,13 @@ export default function HeroSection() {
               asChild
               size="lg"
               variant="outline"
-              className="gap-2 border-purple-500/20 bg-purple-500/5 text-purple-100 backdrop-blur-sm transition-all duration-300 hover:border-purple-500/30 hover:bg-purple-500/10 hover:text-white hover:shadow-lg hover:shadow-purple-500/10"
+              className="gap-2 border-[#2D2B55] bg-[#2D2B55]/5 text-purple-100 backdrop-blur-sm transition-all duration-300 hover:border-[#2D2B55]/50 hover:bg-[#2D2B55]/10 hover:text-white hover:shadow-lg hover:shadow-[#2D2B55]/10"
             >
               <Link href="#features">
                 <Brain className="h-4 w-4" /> See How It Works
               </Link>
             </Button>
-          </div>
+          </motion.div>
         </div>
       </div>
     </header>
