@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, Plus, Trash, Edit, Info } from "lucide-react";
+import { MoreHorizontal, Plus, Trash, Edit, Info, Calendar, Clock, Tag, CheckCircle2, ListTodo, Type } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -612,48 +612,105 @@ export function TaskItem({
       </Dialog>
 
       <Dialog open={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px] bg-[#0E1117] border-[#1F2937] text-white">
           <DialogHeader>
-            <DialogTitle>Task Details</DialogTitle>
+            <DialogTitle className="flex items-center gap-2 text-lg font-medium text-white">
+              <Info className="h-5 w-5 text-muted-foreground" />
+              Task Details
+            </DialogTitle>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div>
-              <Label className="font-bold">Title</Label>
-              <p>{optimisticTask.title}</p>
+          <div className="space-y-5 py-4">
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                <Type className="h-4 w-4" />
+                Title
+              </div>
+              <p className="text-[15px] font-medium text-white">
+                {optimisticTask.title}
+              </p>
             </div>
-            <div>
-              <Label className="font-bold">Priority</Label>
-              <p>{optimisticTask.priority}</p>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                <Tag className="h-4 w-4" />
+                Priority
+              </div>
+              <div className={cn(
+                "inline-flex items-center rounded-full px-2 py-1 text-xs font-medium",
+                optimisticTask.priority === "Low" && "bg-blue-500/10 text-blue-500",
+                optimisticTask.priority === "Medium" && "bg-yellow-500/10 text-yellow-500",
+                optimisticTask.priority === "High" && "bg-orange-500/10 text-orange-500",
+                optimisticTask.priority === "Urgent" && "bg-red-500/10 text-red-500"
+              )}>
+                {optimisticTask.priority}
+              </div>
             </div>
-            <div>
-              <Label className="font-bold">Due Date</Label>
-              <p>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                <Calendar className="h-4 w-4" />
+                Due Date
+              </div>
+              <p className="text-[15px]">
                 {optimisticTask.dueDate
                   ? format(optimisticTask.dueDate, "MMMM d, yyyy")
                   : "Not set"}
               </p>
             </div>
-            <div>
-              <Label className="font-bold">Due Time</Label>
-              <p>{optimisticTask.dueTime || "Not set"}</p>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                <Clock className="h-4 w-4" />
+                Due Time
+              </div>
+              <p className="text-[15px]">
+                {optimisticTask.dueTime ? format(parseTimeString(optimisticTask.dueTime) || new Date(), "h:mm a") : "Not set"}
+              </p>
             </div>
-            <div>
-              <Label className="font-bold">Status</Label>
-              <p>{optimisticTask.completed ? "Completed" : "Active"}</p>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                <CheckCircle2 className="h-4 w-4" />
+                Status
+              </div>
+              <div className={cn(
+                "inline-flex items-center rounded-full px-2 py-1 text-xs font-medium",
+                optimisticTask.completed 
+                  ? "bg-green-500/10 text-green-500" 
+                  : "bg-zinc-500/10 text-zinc-500"
+              )}>
+                {optimisticTask.completed ? "Completed" : "Active"}
+              </div>
             </div>
+
             {optimisticTask.subtasks.length > 0 && (
-              <div>
-                <Label className="font-bold">Subtasks</Label>
-                <ul className="list-disc pl-5">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                  <ListTodo className="h-4 w-4" />
+                  Subtasks
+                </div>
+                <div className="space-y-1.5">
                   {optimisticTask.subtasks.map((subtask) => (
-                    <li
-                      key={subtask.id}
-                      className={subtask.completed ? "line-through" : ""}
+                    <div 
+                      key={subtask.id} 
+                      className={cn(
+                        "flex items-center gap-2 rounded-md border border-[#1F2937] bg-[#1F2937]/20 px-3 py-2",
+                        subtask.completed && "opacity-60"
+                      )}
                     >
-                      {subtask.title}
-                    </li>
+                      <div className={cn(
+                        "h-1.5 w-1.5 rounded-full",
+                        subtask.completed ? "bg-green-500" : "bg-zinc-500"
+                      )} />
+                      <span className={cn(
+                        "text-sm",
+                        subtask.completed && "line-through"
+                      )}>
+                        {subtask.title}
+                      </span>
+                    </div>
                   ))}
-                </ul>
+                </div>
               </div>
             )}
           </div>
