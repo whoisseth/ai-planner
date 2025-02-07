@@ -56,6 +56,7 @@ export function AIChatbox() {
     useState(false);
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const [isToolVisible, setIsToolVisible] = useState(false);
+  const [userTimeZone, setUserTimeZone] = useState<string>("");
 
   // Reset tool status
   const resetToolStatus = useCallback(() => {
@@ -76,7 +77,14 @@ export function AIChatbox() {
   } = useChat({
     api: "/api/chat/ai",
     initialMessages: initialMessages,
-
+    headers: {
+      "x-timezone":
+        userTimeZone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+    },
+    body: {
+      userId: 1,
+      timeZone: userTimeZone,
+    },
     onResponse: (response) => {
       if (response.ok) {
         router.refresh();
@@ -97,10 +105,6 @@ export function AIChatbox() {
     },
     onToolCall: (toolCall) => {
       console.log("Tool call:", toolCall);
-    },
-
-    body: {
-      userId: 1,
     },
   });
 
@@ -317,6 +321,7 @@ export function AIChatbox() {
       });
     }
 
+    // Submit the message with the current input
     handleChatSubmit(e);
   };
 
@@ -334,6 +339,23 @@ export function AIChatbox() {
       toast.error("Failed to copy message");
     }
   };
+
+  useEffect(() => {
+    try {
+      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      setUserTimeZone(timeZone);
+
+      // Update headers for existing chat instance
+      if (timeZone) {
+        // Note: If your chat library doesn't support updating headers dynamically,
+        // you might need to reinitialize the chat
+        const headers = new Headers();
+        headers.set("x-timezone", timeZone);
+      }
+    } catch (error) {
+      console.error("Failed to get timezone:", error);
+    }
+  }, []);
 
   if (!isOpen) {
     return (

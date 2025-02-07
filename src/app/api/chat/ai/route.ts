@@ -8,9 +8,10 @@ import {
   searchTaskByTitleTool,
   updateTaskTool,
 } from "./services/taskTool";
+import { dateTimeTool, determineTargetTimezone } from "./services/dateTimeTool";
 import { groq } from "@ai-sdk/groq";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-
+import { deepseek } from "@ai-sdk/deepseek";
 const lmstudio = createOpenAICompatible({
   name: "lmstudio",
   baseURL: "http://localhost:1234/v1",
@@ -36,41 +37,59 @@ export async function POST(req: Request) {
     const conversation = messages.slice(-4);
     const lastMessage = conversation[conversation.length - 1];
 
-    console.log("💬 Processing conversation:", {
-      conversationLength: conversation.length,
-      lastMessage: lastMessage.content,
-    });
+    // Get timezone from headers or body, with fallbacks
+    const userTimeZone =
+      req.headers.get("x-timezone") || body.timeZone || "UTC"; // Default to UTC if no timezone info is available
+
+    // Determine target timezone based on the user's query
+    const { targetTimeZone, isLocationSpecific } = determineTargetTimezone(
+      lastMessage.content,
+      userTimeZone,
+    );
+
+    console.log("🌍 User timezone:", userTimeZone);
+    console.log(
+      "🎯 Target timezone:",
+      targetTimeZone,
+      isLocationSpecific ? "(Location specific)" : "(User's timezone)",
+    );
 
     const systemPrompt = `
       You are a task management assistant. Your role is to help manage tasks effectively and provide clear responses.
 
-      IMPORTANT RULES for using tools:
-      - For viewing/listing tasks: ONLY use getTasksTool
-      - For creating tasks: ONLY use createTaskTool with REQUIRED fields:
-        * title: string
-        * priority: "High" | "Medium" | "Low"
-        * dueDate: string in "YYYY-MM-DD" format (use today's date if not specified)
-        * dueTime: string in "HH:mm" format (use "23:59" if not specified)
-      - For deleting tasks: ONLY use deleteTaskTool when explicitly asked to delete/remove a task
-      - For searching tasks: ONLY use searchTaskByTitleTool when searching for specific tasks
-      - For updating tasks: ONLY use updateTaskTool when modifying existing tasks
-
-      STRICT RULES:
-      1. When user asks to "show", "list", "view", or "get" tasks - ONLY use getTasksTool
-      2. NEVER use deleteTaskTool unless the user explicitly asks to delete/remove a task
-      3. NEVER use updateTaskTool unless the user explicitly asks to modify/update a task
-      4. ALWAYS provide default values for dueDate (today) and dueTime (23:59) when creating tasks if not specified
+      CRITICAL TOOL USAGE RULES:
+      1. You MUST use createTaskTool for ANY request to create/add a task, with these REQUIRED fields:
+         - title: The exact task title as specified by the user
+         - priority: "High" | "Medium" | "Low" (default to "Medium" if not specified)
+         - dueDate: YYYY-MM-DD format (use today's date if not specified)
+         - dueTime: HH:mm format (use "23:59" if not specified)
+      
+      2. You MUST use getTasksTool for ANY request to show/list/view/get tasks
+      3. You MUST use deleteTaskTool when explicitly asked to delete/remove a task
+      4. You MUST use searchTaskByTitleTool when searching for specific tasks
+      5. You MUST use updateTaskTool when modifying existing tasks
+      6. You MUST use dateTimeTool when:
+         - User asks for current date/time
+         - Need to get precise current time for task operations
+         - Format options: "short" or "full" for date/time display
+         - Can include/exclude seconds in time display
+         - ALWAYS pass the appropriate timezone: "${targetTimeZone}"
+         - For general time queries, use user's timezone
+         - For location-specific queries, use the location's timezone
 
       RESPONSE FORMAT:
-      1. After using any tool, always provide a clear confirmation message about what was done
-      2. For task creation: Confirm the task was created and mention its details
-      3. For task updates: Confirm the changes made
-      4. For task deletion: Confirm what was deleted
+      1. ALWAYS call the appropriate tool for task operations
+      2. After using any tool, provide a clear confirmation message about what was done
+      3. Keep responses concise and focused on task management
+      4. For task creation: Confirm the task details after creation
       5. For task listing: Summarize the tasks shown
+      6. For date/time queries: Display in a clear, readable format with timezone information
 
-      Keep responses concise, short as possible, simple, and focused on task management.
-      YOU MUST ALWAYS RESPOND TO THE USER, even if just to acknowledge their greeting
-      You must always give response in english.
+      You must always respond in English and MUST use tools for ANY task-related operation.
+      NEVER skip using tools when handling task-related requests.
+      
+      Current user's timezone: ${userTimeZone}
+      ${isLocationSpecific ? `Target timezone for location: ${targetTimeZone}` : ""}
     `;
 
     return createDataStreamResponse({
@@ -81,8 +100,9 @@ export async function POST(req: Request) {
           try {
             console.log("📡 Attempting to use Ollama model...");
             const result = await streamText({
-              // model: groq("gemma2-9b-it"),
               model: lmstudio("qwen2.5-7b-instruct-1m"),
+              // model: deepseek("deepseek-chat"),
+              // model: groq("gemma2-9b-it"),
               // model: lmstudio("qwen2-math-1.5b-instruct"),
               // model: lmstudio("deepseek-math-7b-instruct"),
               // model: lmstudio("qwen2-0.5b-instruct"),
@@ -97,11 +117,12 @@ export async function POST(req: Request) {
                 deleteTaskTool,
                 searchTaskByTitleTool,
                 updateTaskTool,
+                dateTimeTool,
               },
               maxTokens: 2000,
-              temperature: 0.7,
+              temperature: 0.5,
               toolCallStreaming: true,
-              toolChoice: "required",
+              toolChoice: "auto",
               maxSteps: 5,
               onStepFinish: async (event) => {
                 console.log("🔄 Step finished event:", {
@@ -118,10 +139,29 @@ export async function POST(req: Request) {
                     "🛠️ Tool calls made:",
                     JSON.stringify(event.toolCalls, null, 2),
                   );
+                } else if (event.stepType === "tool-result") {
+                  console.warn("⚠️ Tool result step without any tool calls");
                 }
 
                 if (event.text) {
                   console.log("📤 Generated text:", event.text);
+                }
+
+                // Validate tool usage for task creation requests
+                if (
+                  event.text?.toLowerCase().includes("create") ||
+                  event.text?.toLowerCase().includes("add") ||
+                  event.text?.toLowerCase().includes("new task")
+                ) {
+                  if (
+                    !event.toolCalls?.some(
+                      (call) => call.toolName === "createTaskTool",
+                    )
+                  ) {
+                    console.warn(
+                      "⚠️ Task creation requested but createTaskTool not called",
+                    );
+                  }
                 }
               },
               onFinish: async (result) => {
@@ -147,16 +187,19 @@ export async function POST(req: Request) {
                   console.warn("⚠️ No text generated in the result");
                   const fallbackResponse =
                     "Hello! I'm here to help you manage your tasks. How can I assist you today?";
-                  await saveMessageWithEmbedding(
-                    user.id,
-                    lastMessage.content,
-                    "user",
-                  );
-                  await saveMessageWithEmbedding(
-                    user.id,
-                    fallbackResponse,
-                    "assistant",
-                  );
+
+                  await Promise.all([
+                    saveMessageWithEmbedding(
+                      user.id,
+                      lastMessage.content,
+                      "user",
+                    ),
+                    saveMessageWithEmbedding(
+                      user.id,
+                      fallbackResponse,
+                      "assistant",
+                    ),
+                  ]);
                   dataStream.write(`0:${fallbackResponse}\n`);
                 }
               },
