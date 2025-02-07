@@ -21,6 +21,26 @@ const formatDate = (date: Date): string => {
   });
 };
 
+// Add new helper function to validate date is not in the past
+const validateDate = (date: Date, timeZone?: string): Date => {
+  // Get current date/time in the specified timezone using the existing tool
+  const currentDateTime = getCurrentDateTime(timeZone);
+  const now = new Date(currentDateTime.timestamp);
+
+  // Reset time part for date comparison
+  const dateToCheck = new Date(date);
+  dateToCheck.setHours(0, 0, 0, 0);
+  const todayDate = new Date(now);
+  todayDate.setHours(0, 0, 0, 0);
+
+  // If date is in the past, return today's date
+  if (dateToCheck < todayDate) {
+    console.warn("Past date detected, using current date instead");
+    return todayDate;
+  }
+  return date;
+};
+
 // Helper function to convert 12-hour time to 24-hour format
 const convertTo24HourFormat = (time: string): string => {
   // Handle empty or invalid input
@@ -111,36 +131,30 @@ export const createTaskTool = tool({
     title: z.string().describe("The title of the task"),
     priority: z
       .enum(["Low", "Medium", "High", "Urgent"])
-      .optional()
+      .default("Medium")
       .describe("Priority level of the task"),
     dueDate: z
       .string()
-      .nullable()
       .optional()
-      .describe("Due date for the task (e.g., '5 Feb 2025' or 'in 5 minutes')"),
+      .describe("Due date for the task in YYYY-MM-DD format"),
     dueTime: z
       .string()
       .optional()
-      .describe(
-        "Due time for the task (e.g., '11:30 AM' or '5 minutes later')",
-      ),
-    timeZone: z
-      .string()
-      .optional()
-      .describe("The timezone to use for the task"),
+      .describe("Due time for the task in HH:mm 24-hour format"),
+    timeZone: z.string().describe("The timezone to use for the task"),
   }),
   execute: async ({
     title,
-    priority = "Low",
+    priority = "Medium",
     dueDate,
     dueTime,
     timeZone,
   }: {
     title: string;
     priority?: "Low" | "Medium" | "High" | "Urgent";
-    dueDate?: string | null;
+    dueDate?: string;
     dueTime?: string;
-    timeZone?: string;
+    timeZone: string;
   }) => {
     try {
       console.log("Creating task with parameters:", {
@@ -158,53 +172,35 @@ export const createTaskTool = tool({
       const currentDateTime = getCurrentDateTime(timeZone);
       const now = new Date(currentDateTime.timestamp);
 
-      // Handle relative time expressions
-      let targetDate: Date;
-      if (dueTime && dueTime.toLowerCase().includes("later")) {
-        const relativeDate = parseRelativeTime(dueTime, timeZone);
-        if (relativeDate) {
-          targetDate = relativeDate;
-        } else {
-          targetDate = now;
-        }
-      } else {
-        // Parse the date if provided
-        if (dueDate === null) {
-          targetDate = now;
-        } else {
-          try {
-            targetDate = dueDate ? new Date(dueDate) : now;
-            if (isNaN(targetDate.getTime())) {
-              console.error("Invalid date provided, using current date");
-              targetDate = now;
-            }
-          } catch (error: any) {
-            console.error("Error parsing date:", error);
-            targetDate = now;
+      // Set default date to today
+      let targetDate = now;
+
+      // Parse and validate date if provided
+      if (dueDate) {
+        try {
+          const parsedDate = new Date(dueDate);
+          if (!isNaN(parsedDate.getTime())) {
+            targetDate = validateDate(parsedDate, timeZone);
+          } else {
+            console.warn("Invalid date format provided, using current date");
           }
+        } catch (error) {
+          console.warn("Error parsing date:", error);
         }
       }
 
-      // Format the time if provided
-      let formattedTime = dueTime;
+      // Set default time to end of day
+      let formattedTime = "23:59";
+
+      // Parse and validate time if provided
       if (dueTime) {
-        if (dueTime.toLowerCase().includes("later")) {
-          const relativeDate = parseRelativeTime(dueTime, timeZone);
-          if (relativeDate) {
-            formattedTime = relativeDate.toLocaleTimeString("en-US", {
-              hour: "2-digit",
-              minute: "2-digit",
-              hour12: false,
-              timeZone,
-            });
-          }
+        const convertedTime = convertTo24HourFormat(dueTime);
+        if (convertedTime) {
+          formattedTime = convertedTime;
         } else {
-          formattedTime = convertTo24HourFormat(dueTime);
-          if (!formattedTime) {
-            throw new Error(
-              "Invalid time format. Please use either 24-hour format (HH:mm) or 12-hour format (h:mm AM/PM)",
-            );
-          }
+          console.warn(
+            "Invalid time format provided, using default time 23:59",
+          );
         }
       }
 
@@ -212,7 +208,7 @@ export const createTaskTool = tool({
         title,
         priority,
         dueDate: targetDate,
-        dueTime: formattedTime || null,
+        dueTime: formattedTime,
         completed: false,
         userId: user.id,
       };
@@ -224,13 +220,13 @@ export const createTaskTool = tool({
 
       return {
         success: true,
-        message: `Task "${title}" has been created successfully for ${formatDate(targetDate)} at ${formattedTime || "23:59"}`,
+        message: `Task "${title}" has been created successfully for ${formatDate(targetDate)} at ${formattedTime}`,
         task: {
           id: task.id,
           title: task.title,
           priority: task.priority,
           dueDate: formatDate(targetDate),
-          dueTime: task.dueTime,
+          dueTime: formattedTime,
           completed: task.completed,
         },
       };
@@ -457,7 +453,7 @@ export const updateTaskTool = tool({
       const user = await getCurrentUser();
       if (!user) throw new Error("User not authenticated");
 
-      // Get current date/time in the specified timezone
+      // Get current date/time in the specified timezone using the existing tool
       const currentDateTime = getCurrentDateTime(timeZone);
       const now = new Date(currentDateTime.timestamp);
 
@@ -484,6 +480,8 @@ export const updateTaskTool = tool({
             if (isNaN(targetDate.getTime())) {
               throw new Error("Invalid date format");
             }
+            // Validate and adjust date if it's in the past
+            targetDate = validateDate(targetDate, timeZone);
           } catch (error) {
             throw new Error("Invalid date format");
           }

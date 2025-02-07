@@ -61,8 +61,9 @@ export async function POST(req: Request) {
       1. You MUST use createTaskTool for ANY request to create/add a task, with these REQUIRED fields:
          - title: The exact task title as specified by the user
          - priority: "High" | "Medium" | "Low" (default to "Medium" if not specified)
-         - dueDate: YYYY-MM-DD format (use today's date if not specified)
-         - dueTime: HH:mm format (use "23:59" if not specified)
+         - dueDate: YYYY-MM-DD format (use current date if not specified)
+         - dueTime: HH:mm format in 24-hour time (use "23:59" if not specified)
+         - timeZone: User's timezone (required for proper date/time handling)
       
       2. You MUST use getTasksTool for ANY request to show/list/view/get tasks
       3. You MUST use deleteTaskTool when explicitly asked to delete/remove a task
