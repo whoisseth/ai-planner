@@ -75,18 +75,18 @@ export function ChatInput({
                         }}
                     />
                 </form>
-                <div className="absolute right-0 bottom-0 flex items-center gap-1 px-2 ">
+                <div className="absolute right-0 bottom-0 flex items-center gap-1 px-2  ">
                     <Button
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="rounded-full"
+                        className="rounded-full hidden"
                         onClick={() => toggleMicrophone((text) => setInput(text))}
                     >
                         {isRecording ? (
                             <MicOff className="size-5 text-red-500" />
                         ) : (
-                            <Mic className="size-5 text-zinc-400" />
+                            <Mic className="size-5 text-zinc-400 " />
                         )}
                     </Button>
                     {isLoading ? (
