@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
-import { Maximize2, Minimize2, X } from "lucide-react";
+import { Maximize2, Minimize2, X, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ChatHeaderProps {
@@ -9,6 +9,7 @@ interface ChatHeaderProps {
   setIsFullScreen: (value: boolean) => void;
   setIsOpen: (value: boolean) => void;
   setWidth: (value: number) => void;
+  onClearChat: () => void;
 }
 
 /**
@@ -21,6 +22,7 @@ export function ChatHeader({
   setIsFullScreen,
   setIsOpen,
   setWidth,
+  onClearChat,
 }: ChatHeaderProps) {
   return (
     <div
@@ -38,6 +40,15 @@ export function ChatHeader({
         AI Assistant
       </h3>
       <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onClearChat}
+          className="hover:bg-destructive/10 hover:text-destructive"
+          title="Clear chat history"
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
         {!isMobile && (
           <Button
             variant="ghost"

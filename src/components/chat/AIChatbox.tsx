@@ -57,6 +57,7 @@ export function AIChatbox() {
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const [isToolVisible, setIsToolVisible] = useState(false);
   const [userTimeZone, setUserTimeZone] = useState<string>("");
+  const [isClearing, setIsClearing] = useState(false);
 
   // Reset tool status
   const resetToolStatus = useCallback(() => {
@@ -376,6 +377,33 @@ export function AIChatbox() {
     }
   }, []);
 
+  const handleClearChat = useCallback(async () => {
+    try {
+      setIsClearing(true);
+
+      const response = await fetch("/api/chat/clear", {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        setMessages([]);
+        setCursor(null);
+        setHasMore(false);
+        toast.success("Chat history cleared");
+      } else {
+        throw new Error("Failed to clear chat history");
+      }
+    } catch (error) {
+      console.error("Error clearing chat:", error);
+      toast.error("Failed to clear chat history");
+    } finally {
+      // Add a small delay before setting isClearing to false to allow animations to complete
+      setTimeout(() => {
+        setIsClearing(false);
+      }, 300);
+    }
+  }, [setMessages]);
+
   if (!isOpen) {
     return (
       <Button
@@ -426,6 +454,7 @@ export function AIChatbox() {
           setIsFullScreen={setIsFullScreen}
           setIsOpen={setIsOpen}
           setWidth={setWidth}
+          onClearChat={handleClearChat}
         />
 
         <div
@@ -444,6 +473,7 @@ export function AIChatbox() {
             handleCopyMessage={handleCopyMessage}
             isFullScreen={isFullScreen}
             isDragging={isDragging}
+            isClearing={isClearing}
           />
           <div ref={messagesEndRef} />
         </div>
