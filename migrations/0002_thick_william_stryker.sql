@@ -1,0 +1,1 @@
+ALTER TABLE `profile` ADD `use_custom_groq_key` integer DEFAULT false NOT NULL;

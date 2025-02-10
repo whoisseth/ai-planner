@@ -8,6 +8,20 @@
       "when": 1737545896274,
       "tag": "0000_right_thaddeus_ross",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1739221388669,
+      "tag": "0001_damp_mac_gargan",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1739221878745,
+      "tag": "0002_thick_william_stryker",
+      "breakpoints": true
     }
   ]
 }

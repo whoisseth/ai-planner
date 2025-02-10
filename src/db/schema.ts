@@ -60,6 +60,8 @@ export const profiles = sqliteTable("profile", {
   imageId: text("image_id"),
   image: text("image"),
   bio: text("bio").notNull().default(""),
+  groqApiKey: text("groq_api_key"),
+  useCustomGroqKey: integer("use_custom_groq_key", { mode: "boolean" }).notNull().default(false),
 });
 
 export const sessions = sqliteTable("session", {

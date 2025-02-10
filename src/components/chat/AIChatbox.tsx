@@ -455,6 +455,8 @@ export function AIChatbox() {
           setIsOpen={setIsOpen}
           setWidth={setWidth}
           onClearChat={handleClearChat}
+          onToggleExpand={() => setIsFullScreen(!isFullScreen)}
+          hasChatMessages={messages.length > 0}
         />
 
         <div

@@ -1,0 +1,1 @@
+ALTER TABLE `profile` ADD `groq_api_key` text;
