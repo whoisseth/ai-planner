@@ -47,3 +47,5 @@ local.db
 # NPM specific files
 package-lock.json
 .npm
+
+Todo.md
