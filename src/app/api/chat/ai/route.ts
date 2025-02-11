@@ -20,7 +20,7 @@ const lmstudio = createOpenAICompatible({
   baseURL: "http://localhost:1234/v1",
 });
 
-export const maxDuration = 300;
+export const maxDuration = 60;
 
 export async function POST(req: Request) {
   console.log("🚀 Chat API route handler started");
