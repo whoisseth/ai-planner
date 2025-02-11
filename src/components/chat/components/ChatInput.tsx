@@ -50,6 +50,7 @@ export function ChatInput({
             autoFocus
             ref={textareaRef}
             value={input}
+            disabled={isLoading}
             onChange={(e) => {
               handleInputChange(e);
               requestAnimationFrame(adjustTextareaHeight);
@@ -59,8 +60,11 @@ export function ChatInput({
                 stopRecording();
               }
             }}
-            placeholder="Type a message..."
-            className="min-h-[96px] w-full resize-none overflow-y-auto rounded-lg border-0 bg-transparent py-3 text-sm focus:ring-0"
+            placeholder={isLoading ? "Waiting for response..." : "Type a message..."}
+            className={cn(
+              "min-h-[96px] w-full resize-none overflow-y-auto rounded-lg border-0 bg-transparent py-3 text-sm focus:ring-0",
+              isLoading && "opacity-50 cursor-not-allowed"
+            )}
             style={{
               maxHeight: "200px",
               paddingRight: "80px",
@@ -84,6 +88,7 @@ export function ChatInput({
             size="icon"
             className="hidden rounded-full"
             onClick={() => toggleMicrophone((text) => setInput(text))}
+            disabled={isLoading}
           >
             {isRecording ? (
               <MicOff className="size-5 text-red-500" />
@@ -96,7 +101,7 @@ export function ChatInput({
               type="button"
               variant="ghost"
               size="icon"
-              className={cn("rounded-full")} 
+              className="rounded-full hover:bg-red-100 hover:text-red-500"
               onClick={stop}
               title="Stop generating"
             >
