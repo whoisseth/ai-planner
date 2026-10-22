@@ -70,7 +70,7 @@
     "lucide-react": "0.381.0",
     "microsoft-cognitiveservices-speech-sdk": "^1.42.0",
     "nanoid": "^5.0.9",
-    "next": "15.1.5",
+    "next": "15.5.27",
     "next-themes": "0.3.0",
     "nextjs-toploader": "1.6.12",
     "nprogress": "^0.2.0",
@@ -99,7 +99,7 @@
     "drizzle-kit": "0.21.4",
     "esbuild-register": "3.5.0",
     "eslint": "8.57.0",
-    "eslint-config-next": "15.1.5",
+    "eslint-config-next": "15.5.27",
     "eslint-config-prettier": "^9.0.0",
     "postcss": "8.4.38",
     "prettier": "^3.3.2",
@@ -109,8 +109,7 @@
     "typescript": "5.4.5"
   },
   "engines": {
-    "node": ">=20.0.0",
-    "pnpm": ">=9.0.0"
+    "node": "24.x"
   },
   "packageManager": "pnpm@9.0.0",
   "pnpm": {
